@@ -1,0 +1,21 @@
+{
+  "name": "syntax-analyzer",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/JackAnalyzer.ts",
+    "test": "vitest --fileParallelism=false",
+    "typecheck": "tsc --noEmit",
+    "build": "rm -rf dist && esbuild src/JackAnalyzer.ts --platform=node --format=esm --target=node16 --bundle --outfile=dist/JackAnalyzer.js",
+    "project10": "rm -rf ./submissions && mkdir submissions && echo 'nodejs' > submissions/lang.txt && echo '{\"type\":\"module\"}' > submissions/package.json && npm run build && cp dist/* submissions && cd submissions && zip -r project10.zip *"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "esbuild": "0.28.0",
+    "eslint": "^10.0.3",
+    "memfs": "^4.56.10",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1",
+    "vitest": "^4.0.17"
+  }
+}

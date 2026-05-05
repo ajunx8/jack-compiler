@@ -1,0 +1,21 @@
+// this template made from tsconfig.guide
+// compare with https://www.typescriptlang.org/docs/handbook/modules/guides/choosing-compiler-options.html
+{
+  "compilerOptions": {
+    "target": "es2022", // test this!
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "rootDir": ".",
+    "module": "nodenext",
+    "lib": [
+      "es2022"
+    ]
+  },
+  "exclude": [
+    "node_modules", // for defensive programming
+  ]
+}
