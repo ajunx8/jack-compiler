@@ -18,15 +18,15 @@ test('it successfully handles a valid file', async () => {
 })
 
 test('it successfully handles a valid directory', async () => {
-    const inputDir = 'test/project10-jack-test-files/Square'
+    const inputDir = 'test/11/Square'
     const main = new Main(inputDir)
     await main.handleInput()
 
     const cwd = process.cwd()
     const expectedJackFiles = [
-        `${cwd}/test/project10-jack-test-files/Square/Main.jack`,
-        `${cwd}/test/project10-jack-test-files/Square/Square.jack`,
-        `${cwd}/test/project10-jack-test-files/Square/SquareGame.jack`
+        `${cwd}/test/11/Square/Main.jack`,
+        `${cwd}/test/11/Square/Square.jack`,
+        `${cwd}/test/11/Square/SquareGame.jack`
     ]
     expect(main.jackFiles).toEqual(expectedJackFiles)
 })
