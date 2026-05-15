@@ -14,7 +14,7 @@ export default async function run() {
     try {
         const main = new Main(userArg)
         await main.handleInput()
-        await main.startAnalysis()
+        await main.start()
         console.log("Successfully created xml file")
     } catch (err) {
         process.exitCode = 1;

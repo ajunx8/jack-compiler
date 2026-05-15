@@ -1,5 +1,6 @@
-import { test, expect } from "vitest";
+import { test, expect, describe } from "vitest";
 import { Main } from "../src/Main.js";
+import { JackTokenizer } from "../src/JackTokenizer.js";
 import * as fs from "node:fs/promises"
 import path from "node:path";
 
@@ -34,14 +35,27 @@ test('it successfully handles a valid directory', async () => {
 async function tokenizeDirectory(dir: string) {
     const main = new Main(dir)
     await main.handleInput()
-    await main.createTokenFiles()
-    
+    await createTokenFiles(main)
+
     for (const tokenFile of main.tokenFiles) {
         const tokenFileContents = await fs.readFile(tokenFile, 'utf8')
         const correctTokenFile = `test/project10-jack-test-files-fixture/${path.basename(dir)}/${path.basename(tokenFile)}`
         const correctTokenFileContents = await fs.readFile(correctTokenFile, 'utf8')
-        
+
         expect(tokenFileContents).toBe(correctTokenFileContents)
+    }
+
+    async function createTokenFiles(main: Main) {
+        for (const jackFile of main.jackFiles) {
+            const contents = await main.readJackFile(jackFile)
+            const tokenizer = new JackTokenizer(contents)
+
+            const tokenFileContents = tokenizer.createTokenFileContents()
+
+            const outPath = jackFile.replace('.jack', 'T.xml')
+            main.tokenFiles.push(outPath)
+            await main.writeFile(outPath, tokenFileContents)
+        }
     }
 }
 
@@ -60,32 +74,39 @@ test('it successfully creates valid tokenFiles for Square', async () => {
     await tokenizeDirectory(input)
 })
 
-async function compileDirectory(dir: string) {
-    const main = new Main(dir)
-    await main.handleInput()
-    await main.startAnalysis()
-    
-    for (const xmlFile of main.xmlFiles) {
-        const xmlFileContents = await fs.readFile(xmlFile, 'utf8')
-        const correctXmlFile = `test/project10-jack-test-files-fixture/${path.basename(dir)}/${path.basename(xmlFile)}`
-        const correctXmlFileContents = await fs.readFile(correctXmlFile, 'utf8')
-        
-        expect(xmlFileContents).toBe(correctXmlFileContents)
+describe("full compilation", () => {
+    async function compileDirectoryAndCompare(dir: string) {
+        const main = new Main(dir)
+        await main.handleInput()
+        await main.start()
+
+        // compare xmlFiles
+        for (const xmlFile of main.xmlFiles) {
+            const xmlFileContents = await fs.readFile(xmlFile, 'utf8')
+            const correctXmlFile = `test/project10-jack-test-files-fixture/${path.basename(dir)}/${path.basename(xmlFile)}`
+            const correctXmlFileContents = await fs.readFile(correctXmlFile, 'utf8')
+
+            expect(xmlFileContents).toBe(correctXmlFileContents)
+        }
     }
-}
 
+    // debug this test
+    test('compiles ExpressionLessSquare', async () => {
+        const input = 'test/project10-jack-test-files/ExpressionLessSquare'
+        const main = new Main(input)
+        await main.handleInput()
+        await main.start()
 
-test('compiles ExpressionLessSquare', async () => {
-    const input = 'test/project10-jack-test-files/ExpressionLessSquare'
-    await compileDirectory(input)
-})
+        
+    })
 
-test('compiles Square', async () => {
-    const input = 'test/project10-jack-test-files/Square'
-    await compileDirectory(input)
-})
+    test('compiles Square', async () => {
+        const input = 'test/project10-jack-test-files/Square'
+        await compileDirectoryAndCompare(input)
+    })
 
-test('compiles ArrayTest', async () => {
-    const input = 'test/project10-jack-test-files/ArrayTest'
-    await compileDirectory(input)
+    test('compiles ArrayTest', async () => {
+        const input = 'test/project10-jack-test-files/ArrayTest'
+        await compileDirectoryAndCompare(input)
+    })
 })

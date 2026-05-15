@@ -1,13 +1,20 @@
 import { type JackTokenizer } from "./JackTokenizer.js";
+import { SymbolTable } from "./SymbolTable.js";
+import { VmWriter } from "./VmWriter.js"
 
 export class CompilationEngine {
     tokenizer: JackTokenizer;
-    outContent: string;
+    classST: SymbolTable;
+    subRoutineST: SymbolTable;
+    vmWriter: VmWriter;
+    outContent: string = ""
     indent: number = 0;
 
-    constructor(tokenizer: JackTokenizer) {
+    constructor(tokenizer: JackTokenizer, classST: SymbolTable, subRoutineST: SymbolTable, vmWriter: VmWriter,) {
         this.tokenizer = tokenizer
-        this.outContent = ""
+        this.classST = classST
+        this.subRoutineST = subRoutineST
+        this.vmWriter = vmWriter
     }
 
     private currentToken() {
@@ -19,10 +26,10 @@ export class CompilationEngine {
             throw new SyntaxError("token undefined")
         }
 
-        const curtokenType = this.tokenizer.tokenType
+        const curTokenType = this.tokenizer.tokenType
         const curToken = this.currentToken()
 
-        if (curtokenType === tokenType) {
+        if (curTokenType === tokenType) {
             if (curToken === token) {
                 let xmlEntity;
                 switch (curToken) {
@@ -32,17 +39,18 @@ export class CompilationEngine {
                     case "&": xmlEntity = "&amp;"; break
                     default: xmlEntity = curToken
                 }
-                this.outContent += `\r\n${"  ".repeat(this.indent)}<${curtokenType}> ${xmlEntity} </${curtokenType}>`
+                this.outContent += `\r\n${"  ".repeat(this.indent)}<${curTokenType}> ${xmlEntity} </${curTokenType}>`
             } else {
                 throw new SyntaxError(`expected token: ${token}, recieved: ${curToken}`)
             }
         } else {
-            throw new SyntaxError(`expected TokenType: ${tokenType}, recieved: ${curtokenType}`)
+            throw new SyntaxError(`expected TokenType: ${tokenType}, recieved: ${curTokenType}`)
         }
 
         if (this.tokenizer.hasMoreTokens()) {
             this.tokenizer.advance()
         }
+        return { curToken, curTokenType }
     }
     addNonTerminalStart(nonTerminal: string) {
         this.outContent += `\r\n${"  ".repeat(this.indent)}<${nonTerminal}>`
@@ -58,12 +66,16 @@ export class CompilationEngine {
         this.indent++
         // class: "'class' className '{' classVarDec* subroutineDec* '}'",
         this.processToken("keyword", "class")
-        this.processToken("identifier", this.currentToken())
+        const { curToken: type } = this.processToken("identifier", this.currentToken())
         this.processToken("symbol", "{")
         while (this.currentToken() === 'static' || this.currentToken() === 'field') {
             this.compileClassVarDec()
         }
         while (["constructor", "function", "method"].includes(this.currentToken() || "")) {
+            this.subRoutineST.reset()
+            if (this.currentToken() === "method") {
+                this.subRoutineST.define("this", type, "ARG")
+            }
             this.compileSubroutine()
         }
         this.processToken("symbol", "}")
@@ -72,14 +84,17 @@ export class CompilationEngine {
         return
     }
     compileClassVarDec() {
+        let name: string;
         this.addNonTerminalStart("classVarDec")
         // classVarDec: "('static' | 'field') type varName (',' varName)* ';'"
-        this.processToken("keyword", this.currentToken())
-        this.processType()
-        this.processToken("identifier", this.currentToken())
+        const { curToken: kind } = this.processToken("keyword", this.currentToken())
+        const type = this.processType()
+        name = this.processToken("identifier", this.currentToken()).curToken
+        this.classST.define(name, type, kind)
         while (this.currentToken() === ',') {
             this.processToken("symbol", ",")
-            this.processToken("identifier", this.currentToken())
+            name = this.processToken("identifier", this.currentToken()).curToken
+            this.classST.define(name, type, kind)
         }
         this.processToken("symbol", ";")
 
@@ -87,17 +102,20 @@ export class CompilationEngine {
     }
     processType() {
         // type: "'int' | 'char' | 'boolean' | className"
+        let type;
         switch (this.tokenizer.tokenType) {
-            case "identifier": this.processToken("identifier", this.currentToken()); break
+            case "identifier": type = this.processToken("identifier", this.currentToken()).curToken; break
             case "keyword":
                 switch (this.currentToken()) {
-                    case "int": this.processToken("keyword", "int"); break
-                    case "char": this.processToken("keyword", "char"); break
-                    case "boolean": this.processToken("keyword", "boolean"); break
+                    case "int": type = this.processToken("keyword", "int").curToken; break
+                    case "char": type = this.processToken("keyword", "char").curToken; break
+                    case "boolean": type = this.processToken("keyword", "boolean").curToken; break
                 }
                 break
             default: throw new SyntaxError("missing type")
         }
+
+        return type || ""
     }
     compileSubroutine() {
         this.addNonTerminalStart("subroutineDec")
@@ -122,12 +140,14 @@ export class CompilationEngine {
         this.addNonTerminalStart("parameterList")
 
         if (this.tokenizer.tokenType === "identifier" || curToken === "int" || curToken === "char" || curToken === "boolean") {
-            this.processType()
-            this.processToken("identifier", this.currentToken())
+            let type = this.processType()
+            let name = this.processToken("identifier", this.currentToken()).curToken
+            this.subRoutineST.define(name, type, "ARG")
             while (this.currentToken() === ',') {
                 this.processToken("symbol", ",")
-                this.processType()
-                this.processToken("identifier", this.currentToken())
+                type = this.processType()
+                name = this.processToken("identifier", this.currentToken()).curToken
+                this.subRoutineST.define(name, type, "ARG")
             }
         }
 
@@ -151,11 +171,13 @@ export class CompilationEngine {
         this.addNonTerminalStart("varDec")
 
         this.processToken("keyword", "var")
-        this.processType()
-        this.processToken("identifier", this.currentToken())
+        let type = this.processType()
+        let name = this.processToken("identifier", this.currentToken()).curToken
+        this.subRoutineST.define(name, type, "VAR")
         while (this.currentToken() === ',') {
             this.processToken("symbol", ",")
-            this.processToken("identifier", this.currentToken())
+            name = this.processToken("identifier", this.currentToken()).curToken
+            this.subRoutineST.define(name, type, "VAR")
         }
         this.processToken("symbol", ";")
 

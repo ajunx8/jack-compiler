@@ -1,12 +1,4 @@
-/*
-task: create test to verify cli usage is correct. i.e node JackAnalyzer.js <file|folder>
-create test with vitest test syntax
-invoke the JackAnalyzer.js file with node
-should I invoke the one in dist/ after I build it?
-expectations:
-    1. expects 1 argument to node
-    2. should be a valid file or directory
-*/
+// create test to verify cli usage is correct. i.e node JackAnalyzer.js <file|folder>
 
 import { expect, test } from 'vitest'
 import { execSync } from 'node:child_process'

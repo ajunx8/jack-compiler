@@ -1,9 +1,11 @@
 import { JackTokenizer } from './JackTokenizer.js'
 import { CompilationEngine } from './CompilationEngine.js'
+import { SymbolTable } from "./SymbolTable.js"
 import * as fs from 'node:fs/promises'
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { Stats } from 'node:fs';
+import { VmWriter } from './VmWriter.js';
 
 // app layer
 export class Main {
@@ -11,6 +13,7 @@ export class Main {
     jackFiles: string[] = [];
     tokenFiles: string[] = [];
     xmlFiles: string[] = [];
+    vmFiles: string[] = [];
 
     constructor(userArg: string) {
         this.userArg = userArg
@@ -34,43 +37,36 @@ export class Main {
         return
     }
 
-    private async validateInput(input: string): Promise<Stats> {
+    async validateInput(input: string): Promise<Stats> {
         return stat(input)
     }
 
-    private async readJackFile(jackFile: string) {
+    async readJackFile(jackFile: string) {
         return fs.readFile(jackFile, 'utf8')
     }
 
-    private async writeXMLFile(outPath: string, contents: string) {
+    async writeFile(outPath: string, contents: string) {
         await fs.writeFile(outPath, contents)
     }
 
-    public async startAnalysis(): Promise<void> {
+    public async start(): Promise<void> {
         for (const jackFile of this.jackFiles) {
             const outPath = jackFile.replace('.jack', '.xml')
+            const outPathVM = jackFile.replace('.jack', '.vm')
             this.xmlFiles.push(outPath)
-            
+            this.vmFiles.push(outPathVM)
+
             const contents = await this.readJackFile(jackFile)
             const tokenizer = new JackTokenizer(contents)
-            const engine = new CompilationEngine(tokenizer)
+            const classSymbolTable = new SymbolTable()
+            const subroutineSymbolTable = new SymbolTable()
+            const vmWriter = new VmWriter("I write things")
 
+            const engine = new CompilationEngine(tokenizer, classSymbolTable, subroutineSymbolTable, vmWriter)
             engine.compileClass()
 
-            await this.writeXMLFile(outPath, engine.outContent)
-        }
-    }
-
-    public async createTokenFiles() {
-        for (const jackFile of this.jackFiles) {
-            const contents = await this.readJackFile(jackFile)
-            const tokenizer = new JackTokenizer(contents)
-
-            const tokenFileContents = tokenizer.createTokenFileContents()
-
-            const outPath = jackFile.replace('.jack', 'T.xml')
-            this.tokenFiles.push(outPath)
-            await this.writeXMLFile(outPath, tokenFileContents)
+            await this.writeFile(outPath, engine.outContent)
+            // await this.writeFile(outPathVM, engine.outContent)
         }
     }
 }
