@@ -9,8 +9,9 @@ test('it successfully handles a valid file', async () => {
     const main = new Main(inputFile)
     await main.handleInput()
 
+    const cwd = process.cwd()
     const expectedJackFiles = [
-        "/Users/adriangreksa/Projects/03-home/nand2tetris-resources/jack-syntax-analyzer/test/project10-jack-test-files/test-file-Main.jack"
+        `${cwd}/test/project10-jack-test-files/test-file-Main.jack`
     ]
 
     expect(main.jackFiles).toEqual(expectedJackFiles)
@@ -21,10 +22,11 @@ test('it successfully handles a valid directory', async () => {
     const main = new Main(inputDir)
     await main.handleInput()
 
+    const cwd = process.cwd()
     const expectedJackFiles = [
-        "/Users/adriangreksa/Projects/03-home/nand2tetris-resources/jack-syntax-analyzer/test/project10-jack-test-files/Square/Main.jack",
-        "/Users/adriangreksa/Projects/03-home/nand2tetris-resources/jack-syntax-analyzer/test/project10-jack-test-files/Square/Square.jack",
-        "/Users/adriangreksa/Projects/03-home/nand2tetris-resources/jack-syntax-analyzer/test/project10-jack-test-files/Square/SquareGame.jack"
+        `${cwd}/test/project10-jack-test-files/Square/Main.jack`,
+        `${cwd}/test/project10-jack-test-files/Square/Square.jack`,
+        `${cwd}/test/project10-jack-test-files/Square/SquareGame.jack`
     ]
     expect(main.jackFiles).toEqual(expectedJackFiles)
 })
