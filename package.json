@@ -1,5 +1,5 @@
 {
-  "name": "syntax-analyzer",
+  "name": "jack-compiler",
   "type": "module",
   "scripts": {
     "dev": "tsx src/JackAnalyzer.ts",

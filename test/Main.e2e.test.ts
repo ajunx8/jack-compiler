@@ -5,13 +5,13 @@ import path from "node:path";
 
 // End-to-end testing of the business logic
 test('it successfully handles a valid file', async () => {
-    const inputFile = 'test/project10-jack-test-files/test-file-Main.jack'
+    const inputFile = 'test/11/Seven/Main.jack'
     const main = new Main(inputFile)
     await main.handleInput()
 
     const cwd = process.cwd()
     const expectedJackFiles = [
-        `${cwd}/test/project10-jack-test-files/test-file-Main.jack`
+        `${cwd}/${inputFile}`
     ]
 
     expect(main.jackFiles).toEqual(expectedJackFiles)
