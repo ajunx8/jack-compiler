@@ -9,7 +9,7 @@ interface SymbolRow {
 }
 
 export class SymbolTable {
-    private table: Map<Key, SymbolRow> = new Map();
+    public table: Map<Key, SymbolRow> = new Map();
     private index: number = 0
     private kindCount: {
         [K in Kind]: number
@@ -37,7 +37,6 @@ export class SymbolTable {
     indexOf(name: string) { }
 
     reset() {
-        console.log("table before reset", this.table)
         this.table.clear()
         this.index = 0
         this.kindCount = {
