@@ -1,8 +1,12 @@
+export type Token = {
+    token: string;
+    type: "keyword" | "symbol" | "identifier" | "integerConstant" | "stringConstant";
+}
+
 export class JackTokenizer {
     readonly contents: string = "";
     cursor: number = 0;
-    curToken: string | undefined = undefined;
-    tokenType: "keyword" | "symbol" | "identifier" | "integerConstant" | "stringConstant" | undefined = undefined;
+    curToken: Token | undefined;
     ignoredCharacters = ["\r", "\n", "\t", " ", "/*", "/**", "//"]
 
     constructor(contents: string) {
@@ -68,8 +72,9 @@ export class JackTokenizer {
             return this.contents.startsWith(keyword, this.cursor)
         })
         if (keywordMatch !== undefined) {
-            this.tokenType = "keyword"
-            this.curToken = keywordMatch
+            this.curToken = {
+                token: keywordMatch, type: "keyword"
+            }
             this.cursor += keywordMatch.length
             return
         }
@@ -77,8 +82,9 @@ export class JackTokenizer {
         // symbol
         const symbolMatch = jackGrammar.lexicalElements.symbol.find(symbol => this.contents.startsWith(symbol, this.cursor))
         if (symbolMatch !== undefined) {
-            this.tokenType = "symbol"
-            this.curToken = curChar
+            this.curToken = {
+                token: curChar, type: "symbol"
+            }
             this.cursor += 1
             return
         }
@@ -87,8 +93,9 @@ export class JackTokenizer {
         const integerMatchRegex = /^[0-9]+/
         const integerMatch = this.contents.slice(this.cursor).match(integerMatchRegex)
         if (integerMatch !== null) {
-            this.tokenType = "integerConstant"
-            this.curToken = integerMatch[0]
+            this.curToken = {
+                token: integerMatch[0], type: "integerConstant"
+            }
             this.cursor += integerMatch[0].length
             return
         }
@@ -97,9 +104,10 @@ export class JackTokenizer {
         if (curChar === "\"") {
             const endQuoteIndex = this.contents.indexOf("\"", this.cursor + 1)
             if (endQuoteIndex > this.cursor) {
-                this.tokenType = "stringConstant"
                 const stringConstant = this.contents.slice(this.cursor + 1, endQuoteIndex)
-                this.curToken = stringConstant
+                this.curToken = {
+                    token: stringConstant, type: "stringConstant"
+                }
                 this.cursor = endQuoteIndex + 1
             } else {
                 throw new Error("end-quote not found")
@@ -124,9 +132,9 @@ export class JackTokenizer {
                     break
                 }
             }
-
-            this.tokenType = "identifier"
-            this.curToken = word
+            this.curToken = {
+                token: word, type: "identifier"
+            }
             this.cursor = tempCursor;
             return
         }
@@ -138,9 +146,9 @@ export class JackTokenizer {
         tokenFileContents += "<tokens>"
         while (this.hasMoreTokens()) {
             this.advance()
-            if (this.tokenType !== undefined) {
-                const tag = this.tokenType
-                let token = this.curToken
+            if (this.curToken !== undefined) {
+                const tag = this.curToken.type
+                let token = this.curToken.token
                 switch (token) {
                     case "<": token = "&lt;"; break
                     case ">": token = "&gt;"; break

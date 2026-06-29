@@ -8,7 +8,10 @@ it('tokenizes "class"', () => {
 
     expect(tokenizer.hasMoreTokens()).toBe(true)
     tokenizer.advance()
-    expect(tokenizer.curToken).toBe('class')
+    expect(tokenizer.curToken).toStrictEqual({
+        "token": "class",
+        "type": "keyword",
+    })
     expect(tokenizer.hasMoreTokens()).toBe(false)
 })
 
@@ -23,7 +26,10 @@ it('tokenizes "class Main"', () => {
         i++
     }
 
-    expect(tokenizer.curToken).toBe('Main')
+    expect(tokenizer.curToken).toStrictEqual({
+        "token": "Main",
+        "type": "identifier",
+    })
     expect(tokenizer.hasMoreTokens()).toBe(false)
 })
 
@@ -47,6 +53,9 @@ docs */`
         tokenizer.advance()
         i++
     }
-    expect(tokenizer.curToken).toBe('}')
+    expect(tokenizer.curToken).toStrictEqual({
+        "token": "}",
+        "type": "symbol",
+    })
     expect(tokenizer.hasMoreTokens()).toBe(false)
 })

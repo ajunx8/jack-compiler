@@ -74,7 +74,7 @@ export class Main {
             for (let [k, v] of subroutineSymbolTable.table.entries()) {
                 console.log(k, v)
             }
-            await this.writeFile(outPath, engine.outContent)
+            await this.writeFile(outPath, vmWriter.outContent)
         }
     }
 
@@ -101,7 +101,8 @@ export class Main {
             for (let [k, v] of subroutineSymbolTable.table.entries()) {
                 console.log(k, v)
             }
-            await this.writeFile(outPath, engine.outContent)
+
+            await this.writeFile(outPath, vmWriter.outContent)
         }
     }
 }
