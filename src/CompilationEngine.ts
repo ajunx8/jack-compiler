@@ -1,8 +1,11 @@
 import { type JackTokenizer, type Token } from "./JackTokenizer.js";
-import { SymbolTable, type SymbolRow } from "./SymbolTable.js";
+import { SymbolTable } from "./SymbolTable.js";
 import { VmWriter, type Segment } from "./VmWriter.js"
 
 export class CompilationEngine {
+    opArray = ["+", "-", "*", "/", "&", "|", "<", ">", "="] as const;
+    ifDepth: number = 0;
+
     tokenizer: JackTokenizer;
     symbolTable: SymbolTable;
     vmWriter: VmWriter;
@@ -82,18 +85,22 @@ export class CompilationEngine {
     }
     // subroutineDec: "('constructor' | 'function' | 'method') ('void' | type) subroutineName '('parameterList')' subroutineBody"
     compileSubroutine() {
-        this.processToken("keyword", this.curToken().token)
-
-        const token = this.curToken().token
-        switch (token) {
+        const keyword = this.processToken("keyword", this.curToken().token)
+        const type = this.curToken().token
+        switch (type) {
             case "void": this.processToken("keyword", 'void'); break
             default: this.processType()
         }
-
-        this.processToken("identifier", this.curToken().token)
+        const { token: subroutineName } = this.processToken("identifier", this.curToken().token)
         this.processToken("symbol", "(")
         this.compileParameterList()
         this.processToken("symbol", ")")
+        if (keyword.token === 'constructor') {
+            this.vmWriter.writeFunction(subroutineName, this.symbolTable.subroutineST.kindCount("VAR"))
+            this.vmWriter.writePush("CONST", this.symbolTable.classST.kindCount("FIELD"))
+            this.vmWriter.writeCall("Memory.alloc", 1)                                                                           // call Memory.alloc 1
+            this.vmWriter.writePop("POINTER", 0)                                                                // pop pointer 0
+        }
         this.compileSubroutineBody()
     }
     // parameterList: "((type varName) (',' type varName)*)?"
@@ -180,31 +187,51 @@ export class CompilationEngine {
         this.processToken("keyword", "if")
         this.processToken("symbol", "(")
         this.compileExpression()
+
+        this.vmWriter.writeArithmetic("NOT")            // "not"            
+        this.vmWriter.writeIf(`L${this.ifDepth}`)       // "if-goto L0"     
+
         this.processToken("symbol", ")")
         this.processToken("symbol", "{")
         this.compileStatements()
         this.processToken("symbol", "}")
+
+        this.vmWriter.writeGoto(`L${this.ifDepth + 1}`)   // "goto L1"        
+        this.vmWriter.writeLabel(`L${this.ifDepth}`)    // "label L0"   
+
         if (this.curToken().token === "else") {
             this.processToken("keyword", "else")
             this.processToken("symbol", "{")
             this.compileStatements()
             this.processToken("symbol", "}")
         }
+
+        this.vmWriter.writeLabel(`L${this.ifDepth + 1}`)  // "label L1"       
+        this.ifDepth += 2
     }
     // whileStatement: "'while' '(' expression ')' '{' statements '}'",
     compileWhile() {
+        this.vmWriter.writeLabel(`L${this.ifDepth}`)    // label L1
+
         this.processToken("keyword", "while")
         this.processToken("symbol", "(")
         this.compileExpression()
+
+        this.vmWriter.writeArithmetic("NOT")            // not
+        this.vmWriter.writeIf(`L${this.ifDepth + 1}`)     // if-goto L2
+
         this.processToken("symbol", ")")
         this.processToken("symbol", "{")
         this.compileStatements()
         this.processToken("symbol", "}")
+
+        this.vmWriter.writeGoto(`L${this.ifDepth}`)     // goto L1
+        this.vmWriter.writeGoto(`L${this.ifDepth + 1}`)   // goto L2
+        this.ifDepth += 2
     }
     // doStatement: "'do' subroutineCall ';'",
     compileDo() {
         this.processToken("keyword", "do")
-        // this.compileSubroutineCall() // investigate
         this.compileExpression()
         this.processToken("symbol", ";")
         this.vmWriter.writePop("TEMP", 0)
@@ -213,74 +240,45 @@ export class CompilationEngine {
     compileReturn() {
         this.processToken("keyword", "return")
         this.compileExpression()
-        // switch (this.curToken().type) {
-        //     case "integerConstant":
-        //     case "stringConstant": this.compileExpression(); break
-        //     case "keyword":
-        //         switch (this.curToken().token) {
-        //             case "true":
-        //             case "false":
-        //             case "null":
-        //             case "this": this.compileExpression(); break
-        //         }; break
-        //     case "identifier": this.compileExpression(); break
-        //     case "symbol":
-        //         switch (this.curToken().token) {
-        //             case "-":
-        //             case "~":
-        //             case "(": this.compileExpression(); break
-        //         }
-        // }
-        this.vmWriter.writeReturn()
         this.processToken("symbol", ";")
+        this.vmWriter.writeReturn()
     }
-
-    // subroutineCall: "subroutineName'('expressionList')'|(className | varName)'.'subroutineName'('expressionList')'"
-    // compileSubroutineCall() {
-    //     this.processToken("identifier", this.curToken().token)
-    //     if (this.curToken().token === ".") {
-    //         this.processToken("symbol", ".")
-    //         this.processToken("identifier", this.curToken().token)
-    //     }
-    //     this.processToken("symbol", "(")
-    //     let numExp = this.compileExpressionList()
-    //     this.processToken("symbol", ")")
-    // }
-
     // expression: "term (op term)*"
     compileExpression() {
         this.compileTerm()
 
-        let op;
-        while (op = ["+", "-", "*", "/", "&", "|", "<", ">", "="].find(op => op === this.curToken().token)) {
+        let op: this["opArray"][number] | undefined;
+        while (op = this.opArray.find(op => op === this.curToken().token)) {
             this.processToken("symbol", op)
             this.compileTerm()
-            console.log(op)
+            this.vmWriter.writeArithmetic(op)
         }
     }
     // term: "integerConstant | stringConstant | keywordConstant | varName | "varName'['expression']'" | '('expression')' | (unaryOP term) | subroutineCall"
     compileTerm() {
-        let term: Token | undefined = undefined;
-        switch (this.curToken().type) {
+        let term: Token = this.curToken();
+        switch (term.type) {
             case "integerConstant":
+                this.processToken("integerConstant", term.token);
+                this.vmWriter.writePush("CONST", term.token)
+                break
             case "stringConstant":
-                term = this.processToken(this.curToken().type!, this.curToken().token);
-                console.log(`push ${term?.token}`)
+                this.processToken("stringConstant", term.token); // #TODO
+                this.vmWriter.writePush("TEMP", "404")
                 break
             case "keyword":
-                switch (this.curToken().token) {
-                    case "true":
-                    case "false":
-                    case "null":
-                    case "this":
-                        term = this.processToken(this.curToken().type!, this.curToken().token);
-                        console.log(`push ${term?.token}`)
-                        break
+                switch (term.token) {                                   // #TODO verify
+                    case "true": this.vmWriter.writePush("CONST", -1); break
+                    case "false": this.vmWriter.writePush("CONST", 0); break
+                    case "null": this.vmWriter.writePush("CONST", 0); break
+                    case "this": this.vmWriter.writePush("POINTER", 0); break
                     default: throw new SyntaxError(`SyntaxError: expected keyword ['true' | 'false' | 'null' | 'this'], recieved keyword ${this.curToken()}`)
-                }; break
+                }
+                this.processToken("keyword", term.token)
+                break
             case "identifier":
                 const lookAheadToken = this.tokenizer.contents[this.tokenizer.cursor]
-                this.processToken("identifier", this.curToken().token)
+                this.processToken("identifier", term.token)
                 switch (lookAheadToken) {
                     case "[": // arrays
                         this.processToken("symbol", "[")
@@ -288,20 +286,22 @@ export class CompilationEngine {
                         this.processToken("symbol", "]"); break
                     case ".":
                         this.processToken("symbol", ".")
-                        this.processToken("identifier", this.curToken().token)
+                        this.processToken("identifier", this.curToken().token)  // fall-through: if '.' add identifier before params
                     case "(":
                         this.processToken("symbol", "(")
                         let numExp = this.compileExpressionList()
                         this.processToken("symbol", ")"); break
                 }; break
             case "symbol":
-                switch (this.curToken().token) {
+                switch (term.token) {
                     case "-":
+                        this.processToken("symbol", "-")
+                        this.vmWriter.writeArithmetic("NEG")
+                        this.compileTerm(); break
                     case "~":
-                        term = this.processToken("symbol", this.curToken().token)
-                        console.log(`push ${term?.token}`)
-                        this.compileTerm()
-                        break
+                        this.processToken("symbol", "~")
+                        this.vmWriter.writeArithmetic("NOT")
+                        this.compileTerm(); break
                     case "(":
                         this.processToken("symbol", "(")
                         this.compileExpression()

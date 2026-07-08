@@ -166,7 +166,7 @@ export class JackTokenizer {
     }
 }
 
-const jackGrammar = {
+export const jackGrammar = {
     lexicalElements: {
         keyword: ['class', 'constructor', 'function', 'method', 'field', 'static', 'var', 'int', 'char', 'boolean', 'void', 'true', 'false', 'null', 'this', 'let', 'do', 'if', 'else', 'while', 'return'],
         symbol: ['{', '}', '(', ')', '[', ']', '.', ',', ';', '+', '-', '*', '/', '&', '|', '<', '>', '=', '~'],
@@ -197,11 +197,11 @@ const jackGrammar = {
     },
     expressions: {
         expression: "term (op term)*",
-        term: "integerConstant | stringConstant | keywordConstant | varName | varName'['expression']' | '('expression')' | (unaryOP term) | subroutineCall",
-        subroutineCall: "subroutineName '('expressionList')' | (className | varName)'.'subroutineName '('expressionList')'",
+        term: ['integerConstant', 'stringConstant', 'keywordConstant', 'varName', 'varName"["expression"]"', '"("expression")"', 'unaryOP term', 'subroutineCall'],
+        subroutineCall: ["subroutineName'('expressionList')'", "(className | varName)'.'subroutineName'('expressionList')'"],
         expressionList: "(expression(',' expression)*)?",
-        op: "'+' | '-' | '*' | '/' | '&' | '|' | '<' | '>' | '='",
-        unaryOp: "'-' | '~'",
-        keywordConstant: "'true' | 'false' | 'null' | 'this'"
+        op: ["+", "-", "*", "/", "&", "|", "<", ">", "="],
+        unaryOp: ['-', '~'],
+        keywordConstant: ['true', 'false', 'null', 'this']
     }
-}
+} as const

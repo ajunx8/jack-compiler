@@ -9,29 +9,51 @@ export class VmWriter {
         public outFile: string,
     ) { }
 
-    addLine(textArray: string[]) {
-        this.outContent += '\n' + textArray.join('\n')
+    addLines(text: string) {
+        const lines = '\n' + text.toLocaleLowerCase()
+        this.outContent += lines
+        console.log(lines)
     }
 
-    writePush(segment: Segment, index: number) {
-        this.addLine([`push ${segment.toLocaleLowerCase()} ${index}`])
+    writePush(segment: Segment, index: string | number) {
+        this.addLines(`push ${segment} ${Number(index)}`)
     }
     writePop(segment: Segment, index: number) {
-        this.addLine([`pop ${segment.toLocaleLowerCase()} ${index}`])
+        this.addLines(`pop ${segment} ${index}`)
     }
-    writeArithmetic(command: Command) { }
-    writeLabel(label: string) { }
-    writeGoto(label: string) { }
-    writeIf(label: string) { }
+    writeArithmetic(operation: "+" | "-" | "*" | "/" | "&" | "|" | "<" | ">" | "=" | "NEG" | "NOT") {
+        switch (operation) {
+            case "+": this.addLines("add"); break
+            case "-": this.addLines("sub"); break
+            case "*": this.addLines('multiply'); break
+            case "/": this.addLines('divide'); break
+            case "&": this.addLines("and"); break
+            case "|": this.addLines("or"); break
+            case "<": this.addLines("lt"); break
+            case ">": this.addLines("gt"); break
+            case "=": this.addLines("eq"); break
+            case "NEG": this.addLines("neg"); break
+            case "NOT": this.addLines("not"); break
+            default: throw new SyntaxError(`operation unrecognised: ${operation}`)
+        }
+    }
+    writeLabel(label: string) {
+        this.addLines(label)
+    }
+    writeGoto(label: string) {
+        this.addLines(`goto ${label}`)
+    }
+    writeIf(label: string) {
+        this.addLines(`if-goto ${label}`)
+    }
     writeCall(label: string, nArgs: number) {
-        const vmC = `
-        call ${label} ${nArgs}
-        pop temp 0
-        `
+        this.addLines(`call ${label} ${nArgs}`)
     }
-    writeFunction(label: string, nVars: number) { }
+    writeFunction(label: string, nVars: number) {
+        
+    }
     writeReturn() {
-        this.addLine(["return"])
+        this.addLines("return")
     }
     close() { }
 }
