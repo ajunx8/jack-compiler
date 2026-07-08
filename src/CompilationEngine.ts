@@ -4,8 +4,6 @@ import { VmWriter, type Segment } from "./VmWriter.js"
 
 export class CompilationEngine {
     tokenizer: JackTokenizer;
-    // classST: SymbolTable;
-    // subroutineST: SymbolTable;
     symbolTable: SymbolTable;
     vmWriter: VmWriter;
 
@@ -26,7 +24,7 @@ export class CompilationEngine {
 
         const curToken = this.curToken()
         if (curToken.type !== tokenType || curToken.token !== token) {
-            throw new SyntaxError(`expected token: ${{ token, tokenType }}, recieved: ${curToken}`)
+            throw new SyntaxError(`expected token: ${{ token, tokenType }.toString()}, recieved: ${curToken.toString()}`)
         }
 
         if (this.tokenizer.hasMoreTokens()) {
@@ -85,12 +83,13 @@ export class CompilationEngine {
     // subroutineDec: "('constructor' | 'function' | 'method') ('void' | type) subroutineName '('parameterList')' subroutineBody"
     compileSubroutine() {
         this.processToken("keyword", this.curToken().token)
-        const tokenType = this.curToken().type
-        switch (tokenType) {
-            case "keyword": this.processToken("keyword", 'void'); break
-            case "identifier": this.processType(); break
-            default: throw new SyntaxError("missing void or type")
+
+        const token = this.curToken().token
+        switch (token) {
+            case "void": this.processToken("keyword", 'void'); break
+            default: this.processType()
         }
+
         this.processToken("identifier", this.curToken().token)
         this.processToken("symbol", "(")
         this.compileParameterList()
@@ -281,17 +280,16 @@ export class CompilationEngine {
                 }; break
             case "identifier":
                 const lookAheadToken = this.tokenizer.contents[this.tokenizer.cursor]
+                this.processToken("identifier", this.curToken().token)
                 switch (lookAheadToken) {
-                    default: term = this.processToken("identifier", this.curToken().token); break
                     case "[": // arrays
-                        this.processToken("identifier", this.curToken().token)
                         this.processToken("symbol", "[")
                         this.compileExpression()
                         this.processToken("symbol", "]"); break
-                    case "(": // subroutine Calls
                     case ".":
                         this.processToken("symbol", ".")
                         this.processToken("identifier", this.curToken().token)
+                    case "(":
                         this.processToken("symbol", "(")
                         let numExp = this.compileExpressionList()
                         this.processToken("symbol", ")"); break
