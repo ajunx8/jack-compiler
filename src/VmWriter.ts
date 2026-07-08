@@ -1,9 +1,18 @@
+import { type Kind } from './SymbolTable.js'
 export type Segment = "CONST" | "ARG" | "LOCAL" | "STATIC" | "THIS" | "THAT" | "POINTER" | "TEMP"
 export type Command = "ADD" | "SUB" | "NEG" | "EQ" | "GT" | "LT" | "AND" | "OR" | "NOT"
 
 // this should only write vm commands
 export class VmWriter {
     outContent: string = ''
+    kindToSegmentMap: {
+        [K in Kind]: Segment
+    } = {
+        "FIELD": "THIS", 
+        "STATIC": "STATIC", 
+        "ARG": "ARG", 
+        "VAR": "LOCAL", 
+    }
 
     constructor(
         public outFile: string,
@@ -15,11 +24,13 @@ export class VmWriter {
         console.log(lines)
     }
 
-    writePush(segment: Segment, index: string | number) {
-        this.addLines(`push ${segment} ${Number(index)}`)
+    writePush(segment: Segment | Kind, index: string | number) {
+        const mapped = this.kindToSegmentMap[segment as Kind] || segment;
+        this.addLines(`push ${mapped} ${Number(index)}`)
     }
-    writePop(segment: Segment, index: number) {
-        this.addLines(`pop ${segment} ${index}`)
+    writePop(segment: Segment | Kind, index: number) {
+        const mapped = this.kindToSegmentMap[segment as Kind] || segment;
+        this.addLines(`pop ${mapped} ${index}`)
     }
     writeArithmetic(operation: "+" | "-" | "*" | "/" | "&" | "|" | "<" | ">" | "=" | "NEG" | "NOT") {
         switch (operation) {
@@ -50,7 +61,7 @@ export class VmWriter {
         this.addLines(`call ${label} ${nArgs}`)
     }
     writeFunction(label: string, nVars: number) {
-        
+
     }
     writeReturn() {
         this.addLines("return")

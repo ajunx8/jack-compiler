@@ -40,13 +40,18 @@ export class CompilationEngine {
     compileClass() {
         if (this.tokenizer.hasMoreTokens()) this.tokenizer.advance();
         this.processToken("keyword", "class")
-        const { type } = this.processToken("identifier", this.curToken().token)
+        const { token: className } = this.processToken("identifier", this.curToken().token)
         this.processToken("symbol", "{")
         while (this.curToken().token === 'static' || this.curToken().token === 'field') {
             this.compileClassVarDec()
         }
+
         while (["constructor", "function", "method"].includes(this.curToken().token || "")) {
+            const subroutineType = this.curToken().token
             this.symbolTable.subroutineST.reset()
+            if (subroutineType === "method") {
+                this.symbolTable.subroutineST.define("this", className, "ARG") // need the className
+            }
             this.compileSubroutine()
         }
         this.processToken("symbol", "}")
@@ -95,11 +100,15 @@ export class CompilationEngine {
         this.processToken("symbol", "(")
         this.compileParameterList()
         this.processToken("symbol", ")")
-        if (keyword.token === 'constructor') {
-            this.vmWriter.writeFunction(subroutineName, this.symbolTable.subroutineST.kindCount("VAR"))
-            this.vmWriter.writePush("CONST", this.symbolTable.classST.kindCount("FIELD"))
-            this.vmWriter.writeCall("Memory.alloc", 1)                                                                           // call Memory.alloc 1
-            this.vmWriter.writePop("POINTER", 0)                                                                // pop pointer 0
+        switch (keyword.token) {
+            case 'constructor':
+                this.vmWriter.writeFunction(subroutineName, this.symbolTable.subroutineST.kindCount("VAR"))             // theres no Var's yet! LOL
+                this.vmWriter.writePush("CONST", this.symbolTable.classST.kindCount("FIELD"))
+                this.vmWriter.writeCall("Memory.alloc", 1)                                                              // call Memory.alloc 1
+                this.vmWriter.writePop("POINTER", 0)                                                                    // pop pointer 0
+                break
+            case 'method':
+                this.vmWriter.writeFunction // #TODO 
         }
         this.compileSubroutineBody()
     }
@@ -123,7 +132,7 @@ export class CompilationEngine {
     compileSubroutineBody() {
         this.processToken("symbol", "{")
         while (this.curToken().token === "var") {
-            this.compileVarDec()
+            this.compileVarDec() // need to generate all the local variables first before writing function className.functionName nVars
         }
         this.compileStatements()
         this.processToken("symbol", "}")
@@ -278,19 +287,37 @@ export class CompilationEngine {
                 break
             case "identifier":
                 const lookAheadToken = this.tokenizer.contents[this.tokenizer.cursor]
-                this.processToken("identifier", term.token)
+                let identifier = this.processToken("identifier", term.token)
                 switch (lookAheadToken) {
                     case "[": // arrays
                         this.processToken("symbol", "[")
                         this.compileExpression()
                         this.processToken("symbol", "]"); break
                     case ".":
+                        const st = this.symbolTable.find(identifier.token)
+                        const kind = st.kindOf(identifier.token)
+                        if (kind !== "NONE") {
+                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))         // push identifier
+                        }
+
                         this.processToken("symbol", ".")
-                        this.processToken("identifier", this.curToken().token)  // fall-through: if '.' add identifier before params
-                    case "(":
+                        const methodName = this.processToken("identifier", this.curToken().token).token
                         this.processToken("symbol", "(")
-                        let numExp = this.compileExpressionList()
-                        this.processToken("symbol", ")"); break
+                        const numExp1 = this.compileExpressionList()
+                        this.processToken("symbol", ")")
+                        const className = st.typeOf(identifier.token)
+                        this.vmWriter.writeCall(`${className}.${methodName}`, numExp1 + 1)
+                        break
+                    case "(":
+                        const thisArg = this.symbolTable.subroutineST.kindOf("this")
+                        if (thisArg !== "NONE") {
+                            this.vmWriter.writePush(thisArg, this.symbolTable.subroutineST.indexOf("this"))
+                        }
+                        this.processToken("symbol", "(")
+                        const numExp2 = this.compileExpressionList()
+                        this.processToken("symbol", ")")
+                        this.vmWriter.writeCall(`${identifier.token}`, numExp2 + 1)
+                        break
                 }; break
             case "symbol":
                 switch (term.token) {

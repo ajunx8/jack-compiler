@@ -1,10 +1,10 @@
-type Kind = "STATIC" | "FIELD" | "ARG" | "VAR"
+export type Kind = "STATIC" | "FIELD" | "ARG" | "VAR"
 
 type Name = string;
 export interface SymbolRow {
     type: string;
     kind: Kind;
-    kindCount: number;
+    index: number;
 }
 
 export class BaseTable {
@@ -27,14 +27,18 @@ export class BaseTable {
         const symbolRow = {
             type,
             kind: parsedKind,
-            kindCount: this.kindCountRecord[parsedKind]++
+            index: this.kindCountRecord[parsedKind]++
         }
 
         this.table.set(name, symbolRow)
     }
 
-    kindCount(kind: Kind): number {
-        return this.kindCountRecord[kind]
+    typeOf(name: string): string {
+        const row = this.table.get(name)
+        if (!row) {
+            throw new SyntaxError("variable not defined")
+        }
+        return row.type
     }
 
     kindOf(name: string): Kind | "NONE" {
@@ -46,9 +50,13 @@ export class BaseTable {
         const row = this.table.get(name)
 
         if (!row) {
-            throw new Error("variable not defined")
+            throw new SyntaxError("variable not defined")
         }
-        return row.kindCount
+        return row.index
+    }
+
+    kindCount(kind: Kind): number {
+        return this.kindCountRecord[kind]
     }
 
     reset() {
