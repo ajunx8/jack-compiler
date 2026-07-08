@@ -1,6 +1,7 @@
-type Segment = "CONST" | "ARG" | "LOCAL" | "STATIC" | "THIS" | "THAT" | "POINTER" | "TEMP"
-type Command = "ADD" | "SUB" | "NEG" | "EQ" | "GT" | "LT" | "AND" | "OR" | "NOT"
+export type Segment = "CONST" | "ARG" | "LOCAL" | "STATIC" | "THIS" | "THAT" | "POINTER" | "TEMP"
+export type Command = "ADD" | "SUB" | "NEG" | "EQ" | "GT" | "LT" | "AND" | "OR" | "NOT"
 
+// this should only write vm commands
 export class VmWriter {
     outContent: string = ''
 
@@ -8,13 +9,16 @@ export class VmWriter {
         public outFile: string,
     ) { }
 
-    addLine(text: string) {
-        this.outContent += `\n${text}`
+    addLine(textArray: string[]) {
+        this.outContent += '\n' + textArray.join('\n')
     }
+
     writePush(segment: Segment, index: number) {
-        this.addLine(`push ${index}`)
+        this.addLine([`push ${segment.toLocaleLowerCase()} ${index}`])
     }
-    writePop(segment: Segment, index: number) { }
+    writePop(segment: Segment, index: number) {
+        this.addLine([`pop ${segment.toLocaleLowerCase()} ${index}`])
+    }
     writeArithmetic(command: Command) { }
     writeLabel(label: string) { }
     writeGoto(label: string) { }
@@ -27,7 +31,7 @@ export class VmWriter {
     }
     writeFunction(label: string, nVars: number) { }
     writeReturn() {
-        this.addLine("return")
+        this.addLine(["return"])
     }
     close() { }
 }

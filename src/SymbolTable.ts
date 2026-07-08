@@ -7,7 +7,7 @@ export interface SymbolRow {
     kindCount: number;
 }
 
-export class SymbolTable {
+export class BaseTable {
     public table: Map<Name, SymbolRow> = new Map();
 
     private kindCountRecord: {
@@ -21,7 +21,7 @@ export class SymbolTable {
 
     define(name: string, type: string, kind: string | undefined): void {
         if (kind === undefined) throw new Error("kind is undefined")
-            
+
         const parsedKind = kind.toUpperCase() as Kind
 
         const symbolRow = {
@@ -42,19 +42,49 @@ export class SymbolTable {
         return row ? row.kind : "NONE"
     }
 
-    indexOf(name: string): number | "NONE" {
+    indexOf(name: string): number {
         const row = this.table.get(name)
-        return row ? row.kindCount : "NONE"
+
+        if (!row) {
+            throw new Error("variable not defined")
+        }
+        return row.kindCount
     }
 
     reset() {
         this.table.clear()
-        
+
         this.kindCountRecord = {
             STATIC: 0,
             FIELD: 0,
             ARG: 0,
             VAR: 0
+        }
+    }
+}
+
+export class SymbolTable {
+    classST: BaseTable
+    subroutineST: BaseTable
+
+    constructor() {
+        this.classST = new BaseTable()
+        this.subroutineST = new BaseTable()
+    }
+
+    define(symbolTable: string, name: string, type: string, kind: string | undefined) {
+        if (symbolTable === "class") {
+            this.classST.define(name, type, kind)
+        } else if (symbolTable === "subroutine") {
+            this.subroutineST.define(name, type, kind)
+        }
+    }
+
+    find(name: string) {
+        if (this.subroutineST.table.has(name)) {
+            return this.subroutineST
+        } else {
+            return this.classST
         }
     }
 }

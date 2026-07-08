@@ -1,17 +1,17 @@
 import { type JackTokenizer, type Token } from "./JackTokenizer.js";
 import { SymbolTable, type SymbolRow } from "./SymbolTable.js";
-import { VmWriter } from "./VmWriter.js"
+import { VmWriter, type Segment } from "./VmWriter.js"
 
 export class CompilationEngine {
     tokenizer: JackTokenizer;
-    classST: SymbolTable;
-    subroutineST: SymbolTable;
+    // classST: SymbolTable;
+    // subroutineST: SymbolTable;
+    symbolTable: SymbolTable;
     vmWriter: VmWriter;
 
-    constructor(tokenizer: JackTokenizer, classST: SymbolTable, subRoutineST: SymbolTable, vmWriter: VmWriter,) {
+    constructor(tokenizer: JackTokenizer, symbolTable: SymbolTable, vmWriter: VmWriter,) {
         this.tokenizer = tokenizer
-        this.classST = classST
-        this.subroutineST = subRoutineST
+        this.symbolTable = symbolTable
         this.vmWriter = vmWriter
     }
     private curToken(): Token {
@@ -45,14 +45,7 @@ export class CompilationEngine {
             this.compileClassVarDec()
         }
         while (["constructor", "function", "method"].includes(this.curToken().token || "")) {
-            console.log(`subroutineST before reset`)
-            for (let [k, v] of this.subroutineST.table.entries()) {
-                console.log(k, v)
-            }
-            this.subroutineST.reset()
-            if (this.curToken().token === "method") {
-                this.subroutineST.define("this", type, "ARG")
-            }
+            this.symbolTable.subroutineST.reset()
             this.compileSubroutine()
         }
         this.processToken("symbol", "}")
@@ -64,12 +57,12 @@ export class CompilationEngine {
         const { token: kind } = this.processToken("keyword", this.curToken().token)
         const type = this.processType()
         name = this.processToken("identifier", this.curToken().token).token
-        this.classST.define(name, type, kind)
-        console.log("create Class ST")
+        this.symbolTable.define("class", name, type, kind)
+
         while (this.curToken().token === ',') {
             this.processToken("symbol", ",")
             name = this.processToken("identifier", this.curToken().token).token
-            this.classST.define(name, type, kind)
+            this.symbolTable.define("class", name, type, kind)
         }
         this.processToken("symbol", ";")
     }
@@ -103,8 +96,6 @@ export class CompilationEngine {
         this.compileParameterList()
         this.processToken("symbol", ")")
         this.compileSubroutineBody()
-
-        // if (tokenType === key)
     }
     // parameterList: "((type varName) (',' type varName)*)?"
     compileParameterList() {
@@ -113,12 +104,12 @@ export class CompilationEngine {
         if (curToken.type === "identifier" || curToken.token === "int" || curToken.token === "char" || curToken.token === "boolean") {
             let type = this.processType()
             let name = this.processToken("identifier", this.curToken().token).token
-            this.subroutineST.define(name, type, "ARG")
+            this.symbolTable.define("subroutine", name, type, "ARG")
             while (this.curToken().token === ',') {
                 this.processToken("symbol", ",")
                 type = this.processType()
                 name = this.processToken("identifier", this.curToken().token).token
-                this.subroutineST.define(name, type, "ARG")
+                this.symbolTable.define("subroutine", name, type, "ARG")
             }
         }
     }
@@ -136,11 +127,11 @@ export class CompilationEngine {
         this.processToken("keyword", "var")
         let type = this.processType()
         let name = this.processToken("identifier", this.curToken().token).token
-        this.subroutineST.define(name, type, "VAR")
+        this.symbolTable.define("subroutine", name, type, "VAR")
         while (this.curToken().token === ',') {
             this.processToken("symbol", ",")
             name = this.processToken("identifier", this.curToken().token).token
-            this.subroutineST.define(name, type, "VAR")
+            this.symbolTable.define("subroutine", name, type, "VAR")
         }
         this.processToken("symbol", ";")
     }
@@ -169,15 +160,22 @@ export class CompilationEngine {
         this.processToken("symbol", "=")
         this.compileExpression()
         this.processToken("symbol", ";")
-        // this.subroutineST.table.
+
         // find the variable
-        // if (this.subroutineST.table.has(varToken.token)) {
-        //     const segment = this.subroutineST.kindOf(varToken.token)
-        //     const index = this.subroutineST.indexOf(varToken.token)
-        //     this.vmWriter.writePop(this.subroutineST., 2)
-        // }
-        // write the vm code
+        const st = this.symbolTable.find(varToken.token)
+        const kind = st.kindOf(varToken.token)
+        let segment: Segment
+        switch (kind) {
+            case "FIELD": segment = "THIS"; break
+            case "STATIC": segment = "STATIC"; break
+            case "ARG": segment = "ARG"; break
+            case "VAR": segment = "LOCAL"; break
+            default: throw new Error("kind undefined")
+        }
+        const index = st.indexOf(varToken.token)
+        this.vmWriter.writePop(segment, index)
     }
+
     // ifStatement: "'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?",
     compileIf() {
         this.processToken("keyword", "if")
@@ -207,8 +205,10 @@ export class CompilationEngine {
     // doStatement: "'do' subroutineCall ';'",
     compileDo() {
         this.processToken("keyword", "do")
-        this.compileSubroutineCall()
+        // this.compileSubroutineCall() // investigate
+        this.compileExpression()
         this.processToken("symbol", ";")
+        this.vmWriter.writePop("TEMP", 0)
     }
     // returnStatement: "'return' expression? ';'"
     compileReturn() {
@@ -235,17 +235,19 @@ export class CompilationEngine {
         this.vmWriter.writeReturn()
         this.processToken("symbol", ";")
     }
+
     // subroutineCall: "subroutineName'('expressionList')'|(className | varName)'.'subroutineName'('expressionList')'"
-    compileSubroutineCall() {
-        this.processToken("identifier", this.curToken().token)
-        if (this.curToken().token === ".") {
-            this.processToken("symbol", ".")
-            this.processToken("identifier", this.curToken().token)
-        }
-        this.processToken("symbol", "(")
-        let numExp = this.compileExpressionList()
-        this.processToken("symbol", ")")
-    }
+    // compileSubroutineCall() {
+    //     this.processToken("identifier", this.curToken().token)
+    //     if (this.curToken().token === ".") {
+    //         this.processToken("symbol", ".")
+    //         this.processToken("identifier", this.curToken().token)
+    //     }
+    //     this.processToken("symbol", "(")
+    //     let numExp = this.compileExpressionList()
+    //     this.processToken("symbol", ")")
+    // }
+
     // expression: "term (op term)*"
     compileExpression() {
         this.compileTerm()
@@ -263,7 +265,7 @@ export class CompilationEngine {
         switch (this.curToken().type) {
             case "integerConstant":
             case "stringConstant":
-                term = this.processToken(this.curToken().type!, this.curToken().token); 
+                term = this.processToken(this.curToken().type!, this.curToken().token);
                 console.log(`push ${term?.token}`)
                 break
             case "keyword":
@@ -287,7 +289,12 @@ export class CompilationEngine {
                         this.compileExpression()
                         this.processToken("symbol", "]"); break
                     case "(": // subroutine Calls
-                    case ".": this.compileSubroutineCall(); break
+                    case ".":
+                        this.processToken("symbol", ".")
+                        this.processToken("identifier", this.curToken().token)
+                        this.processToken("symbol", "(")
+                        let numExp = this.compileExpressionList()
+                        this.processToken("symbol", ")"); break
                 }; break
             case "symbol":
                 switch (this.curToken().token) {
@@ -332,8 +339,4 @@ export class CompilationEngine {
         }
         return expressionCount
     }
-
-    // find(symbol: string): SymbolRow {
-    //     if (this.subroutineST.table
-    // }
 }

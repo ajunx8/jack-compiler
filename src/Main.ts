@@ -51,56 +51,17 @@ export class Main {
 
     public async start(): Promise<void> {
         for (const jackFile of this.jackFiles) {
-            const outPath = jackFile.replace('.jack', '.xml')
-            const outPathVM = jackFile.replace('.jack', '.vm')
-            this.xmlFiles.push(outPath)
-            this.vmFiles.push(outPathVM)
-
-            const contents = await this.readJackFile(jackFile)
-            const tokenizer = new JackTokenizer(contents)
-            const classSymbolTable = new SymbolTable()
-            const subroutineSymbolTable = new SymbolTable()
-            const vmWriter = new VmWriter(outPathVM)
-
-            const engine = new CompilationEngine(tokenizer, classSymbolTable, subroutineSymbolTable, vmWriter)
-            console.log(`compiling file: ${outPath}`)
-            engine.compileClass()
-
-            console.log(`final classSymbolTable:`)
-            for (let [k, v] of classSymbolTable.table.entries()) {
-                console.log(k, v)
-            }
-            console.log(`final subroutineSymbolTable:`)
-            for (let [k, v] of subroutineSymbolTable.table.entries()) {
-                console.log(k, v)
-            }
-            await this.writeFile(outPath, vmWriter.outContent)
-        }
-    }
-
-    public async start2(): Promise<void> {
-        for (const jackFile of this.jackFiles) {
             const outPath = jackFile.replace('.jack', '.vm')
             this.vmFiles.push(outPath)
 
             const contents = await this.readJackFile(jackFile)
             const tokenizer = new JackTokenizer(contents)
-            const classSymbolTable = new SymbolTable()
-            const subroutineSymbolTable = new SymbolTable()
+            const symbolTable = new SymbolTable()
             const vmWriter = new VmWriter(outPath)
 
-            const engine = new CompilationEngine(tokenizer, classSymbolTable, subroutineSymbolTable, vmWriter)
-            console.log(`compiling file: ${jackFile}`)
+            const engine = new CompilationEngine(tokenizer, symbolTable, vmWriter)
+            console.log(`compiling file: ${outPath}`)
             engine.compileClass()
-
-            console.log(`final classSymbolTable:`)
-            for (let [k, v] of classSymbolTable.table.entries()) {
-                console.log(k, v)
-            }
-            console.log(`final subroutineSymbolTable:`)
-            for (let [k, v] of subroutineSymbolTable.table.entries()) {
-                console.log(k, v)
-            }
 
             await this.writeFile(outPath, vmWriter.outContent)
         }

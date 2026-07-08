@@ -104,7 +104,7 @@ describe("compilation project 11 programs", () => {
     async function compile(dir: string) {
         const main = new Main(dir)
         await main.handleInput()
-        await main.start2()
+        await main.start()
     }
 
     test('compiles Seven', async () => {
