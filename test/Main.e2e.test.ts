@@ -10,20 +10,16 @@ describe('files and directory input handling', () => {
         const inputFile = 'test/11/Seven/Main.jack'
         const main = new Main(inputFile)
         await main.handleInput()
-
         const cwd = process.cwd()
         const expectedJackFiles = [
             `${cwd}/${inputFile}`
         ]
-
         expect(main.jackFiles).toEqual(expectedJackFiles)
     })
-
     test('it successfully handles a valid directory', async () => {
         const inputDir = 'test/11/Square'
         const main = new Main(inputDir)
         await main.handleInput()
-
         const cwd = process.cwd()
         const expectedJackFiles = [
             `${cwd}/test/11/Square/Main.jack`,
@@ -33,13 +29,22 @@ describe('files and directory input handling', () => {
         expect(main.jackFiles).toEqual(expectedJackFiles)
     })
 })
-
 describe('tokenization project 10 test programs', () => {
+    const baseDir = 'test/project10-jack-test-files'
     async function tokenizeDirectory(dir: string) {
         const main = new Main(dir)
         await main.handleInput()
         await createTokenFiles(main)
-
+        async function createTokenFiles(main: Main) {
+            for (const jackFile of main.jackFiles) {
+                const contents = await main.readJackFile(jackFile)
+                const tokenizer = new JackTokenizer(contents)
+                const tokenFileContents = tokenizer.createTokenFileContents()
+                const outPath = jackFile.replace('.jack', 'T.xml')
+                main.tokenFiles.push(outPath)
+                await main.writeFile(outPath, tokenFileContents)
+            }
+        }
         for (const tokenFile of main.tokenFiles) {
             const tokenFileContents = await fs.readFile(tokenFile, 'utf8')
             const correctTokenFile = `test/project10-jack-test-files-fixture/${path.basename(dir)}/${path.basename(tokenFile)}`
@@ -47,87 +52,55 @@ describe('tokenization project 10 test programs', () => {
 
             expect(tokenFileContents).toBe(correctTokenFileContents)
         }
-
-        async function createTokenFiles(main: Main) {
-            for (const jackFile of main.jackFiles) {
-                const contents = await main.readJackFile(jackFile)
-                const tokenizer = new JackTokenizer(contents)
-
-                const tokenFileContents = tokenizer.createTokenFileContents()
-
-                const outPath = jackFile.replace('.jack', 'T.xml')
-                main.tokenFiles.push(outPath)
-                await main.writeFile(outPath, tokenFileContents)
-            }
-        }
     }
-
-    test('it successfully creates valid tokenFiles for ArrayTest', async () => {
-        const input = 'test/project10-jack-test-files/ArrayTest'
-        await tokenizeDirectory(input)
-    })
-
     test('it successfully creates valid tokenFiles for ExpressionLessSquare', async () => {
-        const input = 'test/project10-jack-test-files/ExpressionLessSquare'
-        await tokenizeDirectory(input)
+        await tokenizeDirectory(`${baseDir}/ExpressionLessSquare`)
     })
-
     test('it successfully creates valid tokenFiles for Square', async () => {
-        const input = 'test/project10-jack-test-files/Square'
-        await tokenizeDirectory(input)
+        await tokenizeDirectory(`${baseDir}/Square`)
+    })
+    test('it successfully creates valid tokenFiles for ArrayTest', async () => {
+        await tokenizeDirectory(`${baseDir}/ArrayTest`)
     })
 })
 
-
-describe("testing Symbol Tables of project 10 programs", () => {
+describe("compilation project 10", () => {
     async function compile(input: string) {
         const main = new Main(input)
         await main.handleInput()
         await main.start()
     }
-    // debug this test
-    test('compiles ExpressionLessSquare', async () => {
-        const input = 'test/project10-jack-test-files/ExpressionLessSquare'
-        compile(input)
+    describe("compilation project 10", () => {
+        const baseDir = 'test/project10-jack-test-files'
+        test('ExpressionLessSquare', async () => {
+            compile(`${baseDir}/ExpressionLessSquare`)
+        })
+        test('Square', async () => {
+            compile(`${baseDir}/Square`)
+        })
+        test('ArrayTest', async () => {
+            compile(`${baseDir}/ArrayTest`)
+        })
     })
-    test('compiles Square', async () => {
-        const input = 'test/project10-jack-test-files/Square'
-        compile(input)
-    })
-    test('compiles ArrayTest', async () => {
-        const input = 'test/project10-jack-test-files/ArrayTest'
-        compile(input)
-    })
-})
-
-describe("compilation project 11 programs", () => {
-    async function compile(dir: string) {
-        const main = new Main(dir)
-        await main.handleInput()
-        await main.start()
-    }
-
-    test('compiles Seven', async () => {
-        await compile('test/11/Seven')
-    })
-
-    test('compiles ConvertToBin', async () => {
-        await compile('test/11/ConvertToBin')
-    })
-
-    test('compiles Square', async () => {
-        await compile('test/11/Square')
-    })
-
-    test('compiles Average', async () => {
-        await compile('test/11/Average')
-    })
-
-    test('compiles Pong', async () => {
-        await compile('test/11/Pong')
-    })
-
-    test('compiles ComplexArrays', async () => {
-        await compile('test/11/ComplexArrays')
+    describe("compilation project 11", () => {
+        const baseDir = 'test/11'
+        test('Seven', async () => {
+            await compile(`${baseDir}/Seven`)
+        })
+        test('ConvertToBin', async () => {
+            await compile(`${baseDir}/ConvertToBin`)
+        })
+        test('Square', async () => {
+            await compile(`${baseDir}/Square`)
+        })
+        test('Average', async () => {
+            await compile(`${baseDir}/Average`)
+        })
+        test('Pong', async () => {
+            await compile(`${baseDir}/Pong`)
+        })
+        test('ComplexArrays', async () => {
+            await compile(`${baseDir}/ComplexArrays`)
+        })
     })
 })
