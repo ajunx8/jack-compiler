@@ -33,12 +33,12 @@ export class BaseTable {
         this.table.set(name, symbolRow)
     }
 
-    typeOf(name: string): string {
+    typeOf(name: string): string | undefined {
         const row = this.table.get(name)
-        if (!row) {
-            throw new SyntaxError("variable not defined")
-        }
-        return row.type
+        // if (!row) {
+        //     throw new SyntaxError("variable not defined")
+        // }
+        return row ? row.type : undefined
     }
 
     kindOf(name: string): Kind | "NONE" {

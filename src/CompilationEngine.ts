@@ -129,7 +129,7 @@ export class CompilationEngine {
         this.vmWriter.writeFunction(subroutineName, this.symbolTable.subroutineST.kindCount("VAR"))                     // function functionName nVars
         switch (subroutineType) {
             case 'constructor':
-                this.vmWriter.writePush("CONST", this.symbolTable.classST.kindCount("FIELD"))
+                this.vmWriter.writePush("CONSTANT", this.symbolTable.classST.kindCount("FIELD"))
                 this.vmWriter.writeCall("Memory.alloc", 1)                                                              // call Memory.alloc 1
                 this.vmWriter.writePop("POINTER", 0)                                                                    // pop pointer 0
                 break
@@ -273,7 +273,7 @@ export class CompilationEngine {
         switch (term.type) {
             case "integerConstant":
                 this.processToken("integerConstant", term.token);
-                this.vmWriter.writePush("CONST", term.token)
+                this.vmWriter.writePush("CONSTANT", term.token)
                 break
             case "stringConstant":
                 this.processToken("stringConstant", term.token); // #TODO
@@ -281,9 +281,9 @@ export class CompilationEngine {
                 break
             case "keyword":
                 switch (term.token) {                                   // #TODO verify
-                    case "true": this.vmWriter.writePush("CONST", -1); break
-                    case "false": this.vmWriter.writePush("CONST", 0); break
-                    case "null": this.vmWriter.writePush("CONST", 0); break
+                    case "true": this.vmWriter.writePush("CONSTANT", 1); this.vmWriter.writeArithmetic("NEG"); break
+                    case "false": this.vmWriter.writePush("CONSTANT", 0); break
+                    case "null": this.vmWriter.writePush("CONSTANT", 0); break
                     case "this": this.vmWriter.writePush("POINTER", 0); break
                     default: throw new SyntaxError(`SyntaxError: expected keyword ['true' | 'false' | 'null' | 'this'], recieved keyword ${this.curToken()}`)
                 }
@@ -300,6 +300,7 @@ export class CompilationEngine {
                     case ".":
                         const st = this.symbolTable.find(identifier.token)
                         const kind = st.kindOf(identifier.token)
+                        const className = st.typeOf(identifier.token) || identifier.token       // for OS class names
                         if (kind !== "NONE") {
                             this.vmWriter.writePush(kind, st.indexOf(identifier.token))         // push identifier
                         }
@@ -309,7 +310,7 @@ export class CompilationEngine {
                         this.processToken("symbol", "(")
                         const numExp1 = this.compileExpressionList()
                         this.processToken("symbol", ")")
-                        const className = st.typeOf(identifier.token)
+
                         this.vmWriter.writeCall(`${className}.${methodName}`, numExp1 + 1)
                         break
                     case "(":

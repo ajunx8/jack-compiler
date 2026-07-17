@@ -1,5 +1,5 @@
 import { type Kind } from './SymbolTable.js'
-export type Segment = "CONST" | "ARG" | "LOCAL" | "STATIC" | "THIS" | "THAT" | "POINTER" | "TEMP"
+export type Segment = "CONSTANT" | "ARGUMENT" | "LOCAL" | "STATIC" | "THIS" | "THAT" | "POINTER" | "TEMP"
 export type Command = "ADD" | "SUB" | "NEG" | "EQ" | "GT" | "LT" | "AND" | "OR" | "NOT"
 
 // this should only write vm commands
@@ -10,7 +10,7 @@ export class VmWriter {
     } = {
         "FIELD": "THIS", 
         "STATIC": "STATIC", 
-        "ARG": "ARG", 
+        "ARG": "ARGUMENT", 
         "VAR": "LOCAL", 
     }
 
@@ -19,25 +19,25 @@ export class VmWriter {
     ) { }
 
     addLines(text: string) {
-        const lines = '\n' + text.toLocaleLowerCase()
+        const lines = '\n' + text
         this.outContent += lines
         console.log(lines)
     }
 
     writePush(segment: Segment | Kind, index: string | number) {
         const mapped = this.kindToSegmentMap[segment as Kind] || segment;
-        this.addLines(`push ${mapped} ${Number(index)}`)
+        this.addLines(`push ${mapped.toLowerCase()} ${Number(index)}`)
     }
     writePop(segment: Segment | Kind, index: number) {
         const mapped = this.kindToSegmentMap[segment as Kind] || segment;
-        this.addLines(`pop ${mapped} ${index}`)
+        this.addLines(`pop ${mapped.toLowerCase()} ${index}`)
     }
     writeArithmetic(operation: "+" | "-" | "*" | "/" | "&" | "|" | "<" | ">" | "=" | "NEG" | "NOT") {
         switch (operation) {
             case "+": this.addLines("add"); break
             case "-": this.addLines("sub"); break
-            case "*": this.addLines('multiply'); break
-            case "/": this.addLines('divide'); break
+            case "*": this.writeCall('Math.multiply', 2); break
+            case "/": this.writeCall('Math.divide', 2); break
             case "&": this.addLines("and"); break
             case "|": this.addLines("or"); break
             case "<": this.addLines("lt"); break
