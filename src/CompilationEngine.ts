@@ -1,3 +1,4 @@
+import { characterMap } from "./hack-charset.js";
 import { type JackTokenizer, type Token } from "./JackTokenizer.js";
 import { SymbolTable } from "./SymbolTable.js";
 import { VmWriter } from "./VmWriter.js"
@@ -27,7 +28,7 @@ export class CompilationEngine {
 
         const curToken = this.curToken()
         if (curToken.type !== tokenType || curToken.token !== token) {
-            throw new SyntaxError(`expected token: ${{ token, tokenType }.toString()}, recieved: ${curToken.toString()}`)
+            throw new SyntaxError(`expected token: ${JSON.stringify({token: token, tokenType: tokenType })}, recieved: ${JSON.stringify(curToken)}`)
         }
 
         if (this.tokenizer.hasMoreTokens()) {
@@ -162,7 +163,7 @@ export class CompilationEngine {
         }
         this.processToken("symbol", ";")
     }
-    
+
     // statements: "statement*"
     // statement: "letStatement | ifStatement | whileStatement | doStatement | returnStatement"
     compileStatements() {
@@ -185,7 +186,7 @@ export class CompilationEngine {
         const index = st.indexOf(varToken.token)
 
         if (this.curToken().token === "[") {
-            if (kind !== "NONE") { 
+            if (kind !== "NONE") {
                 this.vmWriter.writePush(kind, index) // push local 0
             }
             this.processToken("symbol", "[")
@@ -205,19 +206,21 @@ export class CompilationEngine {
     compileIf() {
         this.processToken("keyword", "if")
         this.processToken("symbol", "(")
-        this.compileExpression()
 
+        this.compileExpression()
         this.vmWriter.writeArithmetic("NOT")            // "not"            
-        this.vmWriter.writeIf(`L${this.ifDepth}`)       // "if-goto L0"     
+        const falseLabel = this.ifDepth++;
+        this.vmWriter.writeIf(`L${falseLabel}`)       // "if-goto L0"     
 
         this.processToken("symbol", ")")
         this.processToken("symbol", "{")
         this.compileStatements()
         this.processToken("symbol", "}")
 
-        this.vmWriter.writeGoto(`L${this.ifDepth + 1}`)   // "goto L1"        
-        this.vmWriter.writeLabel(`L${this.ifDepth}`)    // "label L0"   
+        const endLabel = this.ifDepth++
+        this.vmWriter.writeGoto(`L${endLabel}`)   // "goto L1"      
 
+        this.vmWriter.writeLabel(`L${falseLabel}`)    // "label L0"   
         if (this.curToken().token === "else") {
             this.processToken("keyword", "else")
             this.processToken("symbol", "{")
@@ -225,28 +228,24 @@ export class CompilationEngine {
             this.processToken("symbol", "}")
         }
 
-        this.vmWriter.writeLabel(`L${this.ifDepth + 1}`)  // "label L1"       
-        this.ifDepth += 2
+        this.vmWriter.writeLabel(`L${endLabel}`)  // "label L1"       
     }
     // whileStatement: "'while' '(' expression ')' '{' statements '}'",
     compileWhile() {
-        this.vmWriter.writeLabel(`L${this.ifDepth}`)    // label L1
-
+        const startLabel = this.ifDepth++;
+        this.vmWriter.writeLabel(`L${startLabel}`)  // label L1
         this.processToken("keyword", "while")
         this.processToken("symbol", "(")
         this.compileExpression()
-
-        this.vmWriter.writeArithmetic("NOT")            // not
-        this.vmWriter.writeIf(`L${this.ifDepth + 1}`)     // if-goto L2
-
+        this.vmWriter.writeArithmetic("NOT")        // not
+        const endLabel = this.ifDepth++
+        this.vmWriter.writeIf(`L${endLabel}`)       // if-goto L2
         this.processToken("symbol", ")")
         this.processToken("symbol", "{")
         this.compileStatements()
         this.processToken("symbol", "}")
-
-        this.vmWriter.writeGoto(`L${this.ifDepth}`)     // goto L1
-        this.vmWriter.writeGoto(`L${this.ifDepth + 1}`)   // goto L2
-        this.ifDepth += 2
+        this.vmWriter.writeGoto(`L${startLabel}`)   // goto L1
+        this.vmWriter.writeLabel(`L${endLabel}`)    // label L2
     }
     // doStatement: "'do' subroutineCall ';'",
     compileDo() {
@@ -284,8 +283,13 @@ export class CompilationEngine {
                 this.vmWriter.writePush("CONSTANT", term.token)
                 break
             case "stringConstant":
-                this.processToken("stringConstant", term.token); // #TODO
-                this.vmWriter.writePush("TEMP", "404")
+                const stringToken = this.processToken("stringConstant", term.token).token;              // #TODO
+                this.vmWriter.writePush("CONSTANT", stringToken.length)                                 // push constant stringToken.length
+                this.vmWriter.writeCall("String.new", 1)                                                // call String.new 1   // returns String Obj
+                for (let i = 0; i < stringToken.length; i++) {
+                    this.vmWriter.writePush("CONSTANT", characterMap.get(stringToken[i] || "A") || 0)   // push constant charCode(stringToken[i])
+                    this.vmWriter.writeCall("String.appendChar", 2)                                     // call String.appendChar 2
+                }
                 break
             case "keyword":
                 switch (term.token) {                                   // #TODO verify
@@ -346,17 +350,22 @@ export class CompilationEngine {
                         this.processToken("symbol", ")")
                         this.vmWriter.writeCall(`${identifier.token}`, numExp2 + 1)
                         break
+                    default: // if just a variable
+                        if (kind !== "NONE") {
+                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))     // push local 0
+                        }
+                        break
                 }; break
             case "symbol":
                 switch (term.token) {
                     case "-":
                         this.processToken("symbol", "-")
-                        this.vmWriter.writeArithmetic("NEG")
-                        this.compileTerm(); break
+                        this.compileTerm()
+                        this.vmWriter.writeArithmetic("NEG"); break
                     case "~":
                         this.processToken("symbol", "~")
-                        this.vmWriter.writeArithmetic("NOT")
-                        this.compileTerm(); break
+                        this.compileTerm()
+                        this.vmWriter.writeArithmetic("NOT"); break
                     case "(":
                         this.processToken("symbol", "(")
                         this.compileExpression()
