@@ -1,15 +1,14 @@
 import { type JackTokenizer, type Token } from "./JackTokenizer.js";
 import { SymbolTable } from "./SymbolTable.js";
-import { VmWriter, type Segment } from "./VmWriter.js"
+import { VmWriter } from "./VmWriter.js"
 
 export class CompilationEngine {
     opArray = ["+", "-", "*", "/", "&", "|", "<", ">", "="] as const;
     ifDepth: number = 0;
-
+    className: string = "";
     tokenizer: JackTokenizer;
     symbolTable: SymbolTable;
     vmWriter: VmWriter;
-
     constructor(tokenizer: JackTokenizer, symbolTable: SymbolTable, vmWriter: VmWriter,) {
         this.tokenizer = tokenizer
         this.symbolTable = symbolTable
@@ -21,6 +20,7 @@ export class CompilationEngine {
         }
         return this.tokenizer.curToken
     }
+
     // validates the token and advances to the next token
     processToken(tokenType: string, token: string | undefined): Token {
         if (token === undefined) throw new SyntaxError("token undefined")
@@ -35,11 +35,12 @@ export class CompilationEngine {
         }
         return curToken
     }
+
     // class: "'class' className '{' classVarDec* subroutineDec* '}'",
     compileClass() {
         if (this.tokenizer.hasMoreTokens()) this.tokenizer.advance();
-        this.processToken("keyword", "class")
-        const { token: className } = this.processToken("identifier", this.curToken().token)
+        this.processToken("keyword", "class");
+        this.className = this.processToken("identifier", this.curToken().token).token
         this.processToken("symbol", "{")
         while (this.curToken().token === 'static' || this.curToken().token === 'field') {
             this.compileClassVarDec()
@@ -49,14 +50,16 @@ export class CompilationEngine {
             const subroutineType = this.curToken().token
             this.symbolTable.subroutineST.reset()
             if (subroutineType === "method") {
-                this.symbolTable.subroutineST.define("this", className, "ARG")                  // compiling methods (callee)
+                this.symbolTable.subroutineST.define("this", this.className, "ARG")                  // compiling methods (callee)
             }
             this.compileSubroutine()
         }
 
         this.processToken("symbol", "}")
+        this.vmWriter.close()
         return
     }
+
     // classVarDec: "('static' | 'field') type varName (',' varName)* ';'"
     compileClassVarDec() {
         let name: string | undefined;
@@ -72,6 +75,7 @@ export class CompilationEngine {
         }
         this.processToken("symbol", ";")
     }
+
     // type: "'int' | 'char' | 'boolean' | className"
     processType() {
         let type;
@@ -88,6 +92,7 @@ export class CompilationEngine {
         }
         return type || ""
     }
+
     // subroutineDec: "('constructor' | 'function' | 'method') ('void' | type) subroutineName '('parameterList')' subroutineBody"
     compileSubroutine() {
         const subroutineType = this.processToken("keyword", this.curToken().token)
@@ -102,6 +107,7 @@ export class CompilationEngine {
         this.processToken("symbol", ")")
         this.compileSubroutineBody(subroutineType.token, subroutineName)
     }
+
     // parameterList: "((type varName) (',' type varName)*)?"
     compileParameterList() {
         const curToken = this.curToken()
@@ -118,6 +124,7 @@ export class CompilationEngine {
             }
         }
     }
+
     // subroutineBody: "'{' varDec* statements '}'"
     compileSubroutineBody(subroutineType: string, subroutineName: string) {
         this.processToken("symbol", "{")
@@ -125,7 +132,7 @@ export class CompilationEngine {
             this.compileVarDec()
         }
 
-        this.vmWriter.writeFunction(subroutineName, this.symbolTable.subroutineST.kindCount("VAR"))                     // function functionName nVars
+        this.vmWriter.writeFunction(`${this.className}.${subroutineName}`, this.symbolTable.subroutineST.kindCount("VAR"))                     // function functionName nVars
         switch (subroutineType) {
             case 'constructor':
                 this.vmWriter.writePush("CONSTANT", this.symbolTable.classST.kindCount("FIELD"))
@@ -141,6 +148,7 @@ export class CompilationEngine {
         this.compileStatements()
         this.processToken("symbol", "}")
     }
+
     // varDec: "'var' type varName (',' varName)* ';'"
     compileVarDec() {
         this.processToken("keyword", "var")
@@ -154,6 +162,7 @@ export class CompilationEngine {
         }
         this.processToken("symbol", ";")
     }
+    
     // statements: "statement*"
     // statement: "letStatement | ifStatement | whileStatement | doStatement | returnStatement"
     compileStatements() {
@@ -171,28 +180,26 @@ export class CompilationEngine {
     compileLet() {
         this.processToken("keyword", "let")
         let varToken = this.processToken("identifier", this.curToken().token)
+        const st = this.symbolTable.find(varToken.token)
+        const kind = st.kindOf(varToken.token)
+        const index = st.indexOf(varToken.token)
+
         if (this.curToken().token === "[") {
+            if (kind !== "NONE") { 
+                this.vmWriter.writePush(kind, index) // push local 0
+            }
             this.processToken("symbol", "[")
             this.compileExpression()
+            this.vmWriter.writeArithmetic("+")      // add
             this.processToken("symbol", "]")
         }
         this.processToken("symbol", "=")
         this.compileExpression()
         this.processToken("symbol", ";")
 
-        // find the variable
-        const st = this.symbolTable.find(varToken.token)
-        const kind = st.kindOf(varToken.token)
-        let segment: Segment
-        switch (kind) {
-            case "FIELD": segment = "THIS"; break
-            case "STATIC": segment = "STATIC"; break
-            case "ARG": segment = "ARGUMENT"; break
-            case "VAR": segment = "LOCAL"; break
-            default: throw new Error("kind undefined")
+        if (kind !== "NONE") {
+            this.vmWriter.writePop(kind, index)     // "pop local 0"
         }
-        const index = st.indexOf(varToken.token)
-        this.vmWriter.writePop(segment, index)
     }
     // ifStatement: "'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?",
     compileIf() {
@@ -255,6 +262,7 @@ export class CompilationEngine {
         this.processToken("symbol", ";")
         this.vmWriter.writeReturn()
     }
+
     // expression: "term (op term)*"
     compileExpression() {
         this.compileTerm()
@@ -266,6 +274,7 @@ export class CompilationEngine {
             this.vmWriter.writeArithmetic(op)
         }
     }
+
     // term: "integerConstant | stringConstant | keywordConstant | varName | "varName'['expression']'" | '('expression')' | (unaryOP term) | subroutineCall"
     compileTerm() {
         let term: Token = this.curToken();
@@ -296,16 +305,15 @@ export class CompilationEngine {
                 switch (lookAheadToken) {
                     case "[": // arrays
                         if (kind !== "NONE") {
-                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))     // push identifier
+                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))     // push local 0
                         }
                         this.processToken("symbol", "[")
-                        this.compileExpression() // how does the compiler ensure an integerConstant is the final result? 
-                        // hmm it doesnt. It can be a function call that returns an integer. It can only be done in runtime.
-                        this.vmWriter.writeArithmetic("+")                                  // add
+                        this.compileExpression()
+                        this.vmWriter.writeArithmetic("+")     // add
                         this.processToken("symbol", "]")
-                        this.vmWriter.writePop("TEMP", 0)                                   // pop temp 0
-                        this.vmWriter.writePop("POINTER", 1)                                // pop pointer 1
-                        this.vmWriter.writePush("THAT", 0)                                  // push that 0
+                        this.vmWriter.writePop("TEMP", 0)      // pop temp 0
+                        this.vmWriter.writePop("POINTER", 1)   // pop pointer 1
+                        this.vmWriter.writePush("THAT", 0)     // push that 0
                         break
                     case ".":
                         if (kind !== "NONE") {
@@ -356,6 +364,7 @@ export class CompilationEngine {
                 }; break
         }
     }
+
     // expressionList: "(expression(',' expression)*)?"
     compileExpressionList(): number {
         let expressionCount = 0

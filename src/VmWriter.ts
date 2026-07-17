@@ -66,5 +66,15 @@ export class VmWriter {
     writeReturn() {
         this.addLine("return")
     }
-    close() { }
+    close() {
+        const removeStartingNewLine = () => {
+            if (this.outContent[0] === "\n" ) {
+                this.outContent = this.outContent.slice(1)
+            } else {
+                console.log("this shouldn't be here")
+            }
+        }
+
+        removeStartingNewLine()
+    }
 }
