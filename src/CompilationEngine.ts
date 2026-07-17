@@ -35,7 +35,6 @@ export class CompilationEngine {
         }
         return curToken
     }
-
     // class: "'class' className '{' classVarDec* subroutineDec* '}'",
     compileClass() {
         if (this.tokenizer.hasMoreTokens()) this.tokenizer.advance();
@@ -50,7 +49,7 @@ export class CompilationEngine {
             const subroutineType = this.curToken().token
             this.symbolTable.subroutineST.reset()
             if (subroutineType === "method") {
-                this.symbolTable.subroutineST.define("this", className, "ARG") // need the className
+                this.symbolTable.subroutineST.define("this", className, "ARG")                  // compiling methods (callee)
             }
             this.compileSubroutine()
         }
@@ -188,7 +187,7 @@ export class CompilationEngine {
         switch (kind) {
             case "FIELD": segment = "THIS"; break
             case "STATIC": segment = "STATIC"; break
-            case "ARG": segment = "ARG"; break
+            case "ARG": segment = "ARGUMENT"; break
             case "VAR": segment = "LOCAL"; break
             default: throw new Error("kind undefined")
         }
@@ -291,27 +290,43 @@ export class CompilationEngine {
                 break
             case "identifier":
                 const lookAheadToken = this.tokenizer.contents[this.tokenizer.cursor]
-                let identifier = this.processToken("identifier", term.token)
+                const identifier = this.processToken("identifier", term.token)
+                const st = this.symbolTable.find(identifier.token)
+                const kind = st.kindOf(identifier.token)
                 switch (lookAheadToken) {
                     case "[": // arrays
-                        this.processToken("symbol", "[")
-                        this.compileExpression()
-                        this.processToken("symbol", "]"); break
-                    case ".":
-                        const st = this.symbolTable.find(identifier.token)
-                        const kind = st.kindOf(identifier.token)
-                        const className = st.typeOf(identifier.token) || identifier.token       // for OS class names
                         if (kind !== "NONE") {
-                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))         // push identifier
+                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))     // push identifier
                         }
-
-                        this.processToken("symbol", ".")
-                        const methodName = this.processToken("identifier", this.curToken().token).token
-                        this.processToken("symbol", "(")
-                        const numExp1 = this.compileExpressionList()
-                        this.processToken("symbol", ")")
-
-                        this.vmWriter.writeCall(`${className}.${methodName}`, numExp1 + 1)
+                        this.processToken("symbol", "[")
+                        this.compileExpression() // how does the compiler ensure an integerConstant is the final result? 
+                        // hmm it doesnt. It can be a function call that returns an integer. It can only be done in runtime.
+                        this.vmWriter.writeArithmetic("+")                                  // add
+                        this.processToken("symbol", "]")
+                        this.vmWriter.writePop("TEMP", 0)                                   // pop temp 0
+                        this.vmWriter.writePop("POINTER", 1)                                // pop pointer 1
+                        this.vmWriter.writePush("THAT", 0)                                  // push that 0
+                        break
+                    case ".":
+                        if (kind !== "NONE") {
+                            const className = st.typeOf(identifier.token)
+                            this.vmWriter.writePush(kind, st.indexOf(identifier.token))                         // push this 0 
+                            this.processToken("symbol", ".")
+                            const methodName = this.processToken("identifier", this.curToken().token).token
+                            this.processToken("symbol", "(")
+                            const numExp1 = this.compileExpressionList()
+                            this.processToken("symbol", ")")
+                            this.vmWriter.writeCall(`${className}.${methodName}`, numExp1 + 1)
+                        } else {
+                            // if doesn't exist, assume its an OS **function**. trust the number of args are correct.
+                            const className = identifier.token // assume identifier is the className
+                            this.processToken("symbol", ".")
+                            const methodName = this.processToken("identifier", this.curToken().token).token
+                            this.processToken("symbol", "(")
+                            const numExp1 = this.compileExpressionList()
+                            this.processToken("symbol", ")")
+                            this.vmWriter.writeCall(`${className}.${methodName}`, numExp1)
+                        }
                         break
                     case "(":
                         const thisArg = this.symbolTable.subroutineST.kindOf("this")

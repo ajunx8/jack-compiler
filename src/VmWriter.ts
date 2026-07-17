@@ -18,7 +18,7 @@ export class VmWriter {
         public outFile: string,
     ) { }
 
-    addLines(text: string) {
+    addLine(text: string) {
         const lines = '\n' + text
         this.outContent += lines
         console.log(lines)
@@ -26,45 +26,45 @@ export class VmWriter {
 
     writePush(segment: Segment | Kind, index: string | number) {
         const mapped = this.kindToSegmentMap[segment as Kind] || segment;
-        this.addLines(`push ${mapped.toLowerCase()} ${Number(index)}`)
+        this.addLine(`push ${mapped.toLowerCase()} ${Number(index)}`)
     }
     writePop(segment: Segment | Kind, index: number) {
         const mapped = this.kindToSegmentMap[segment as Kind] || segment;
-        this.addLines(`pop ${mapped.toLowerCase()} ${index}`)
+        this.addLine(`pop ${mapped.toLowerCase()} ${index}`)
     }
     writeArithmetic(operation: "+" | "-" | "*" | "/" | "&" | "|" | "<" | ">" | "=" | "NEG" | "NOT") {
         switch (operation) {
-            case "+": this.addLines("add"); break
-            case "-": this.addLines("sub"); break
+            case "+": this.addLine("add"); break
+            case "-": this.addLine("sub"); break
             case "*": this.writeCall('Math.multiply', 2); break
             case "/": this.writeCall('Math.divide', 2); break
-            case "&": this.addLines("and"); break
-            case "|": this.addLines("or"); break
-            case "<": this.addLines("lt"); break
-            case ">": this.addLines("gt"); break
-            case "=": this.addLines("eq"); break
-            case "NEG": this.addLines("neg"); break
-            case "NOT": this.addLines("not"); break
+            case "&": this.addLine("and"); break
+            case "|": this.addLine("or"); break
+            case "<": this.addLine("lt"); break
+            case ">": this.addLine("gt"); break
+            case "=": this.addLine("eq"); break
+            case "NEG": this.addLine("neg"); break
+            case "NOT": this.addLine("not"); break
             default: throw new SyntaxError(`operation unrecognised: ${operation}`)
         }
     }
     writeLabel(label: string) {
-        this.addLines(label)
+        this.addLine(`label ${label}`)
     }
     writeGoto(label: string) {
-        this.addLines(`goto ${label}`)
+        this.addLine(`goto ${label}`)
     }
     writeIf(label: string) {
-        this.addLines(`if-goto ${label}`)
+        this.addLine(`if-goto ${label}`)
     }
     writeCall(label: string, nArgs: number) {
-        this.addLines(`call ${label} ${nArgs}`)
+        this.addLine(`call ${label} ${nArgs}`)
     }
     writeFunction(label: string, nVars: number) {
-
+        this.addLine(`function ${label} ${nVars}`)
     }
     writeReturn() {
-        this.addLines("return")
+        this.addLine("return")
     }
     close() { }
 }
