@@ -1,11 +1,10 @@
 import { JackTokenizer } from './JackTokenizer.js'
 import { CompilationEngine } from './CompilationEngine.js'
 import { SymbolTable } from "./SymbolTable.js"
+import { VmWriter } from './VmWriter.js';
 import * as fs from 'node:fs/promises'
-import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { Stats } from 'node:fs';
-import { VmWriter } from './VmWriter.js';
 
 // app layer
 export class Main {
@@ -38,7 +37,7 @@ export class Main {
     }
 
     async validateInput(input: string): Promise<Stats> {
-        return stat(input)
+        return fs.stat(input)
     }
 
     async readJackFile(jackFile: string) {

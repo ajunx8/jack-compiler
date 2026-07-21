@@ -58,17 +58,12 @@ export class JackTokenizer {
         return this.cursor < this.contents.length
     }
 
-    // gets next token from input, and makes it the current token.
-    // should only be called if hasMoreTokens is true
     advance() {
         this.skipIgnoredCharacters()
         const curChar = this.contents[this.cursor]
         if (curChar === undefined) {
             throw new Error("curChar is undefined")
         }
-
-        // bug: Tokenizer is parsing the "do" from Main.double() as the keyword "do" when it's actually an identifier, "double".
-        // keyword
         const letterMatch = this.contents.slice(this.cursor).match(/^[a-z]+/)
         let keywordMatch;
         if (letterMatch && (keywordMatch = jackGrammar.lexicalElements.keyword.find(keyword => keyword === letterMatch[0]))) {
@@ -78,8 +73,6 @@ export class JackTokenizer {
             this.cursor += keywordMatch.length
             return
         }
-
-        // symbol
         const symbolMatch = jackGrammar.lexicalElements.symbol.find(symbol => this.contents.startsWith(symbol, this.cursor))
         if (symbolMatch !== undefined) {
             this.curToken = {
@@ -88,8 +81,6 @@ export class JackTokenizer {
             this.cursor += 1
             return
         }
-
-        // integer constant from cursor position
         const integerMatchRegex = /^[0-9]+/
         const integerMatch = this.contents.slice(this.cursor).match(integerMatchRegex)
         if (integerMatch !== null) {
@@ -99,8 +90,6 @@ export class JackTokenizer {
             this.cursor += integerMatch[0].length
             return
         }
-
-        // string constant
         if (curChar === "\"") {
             const endQuoteIndex = this.contents.indexOf("\"", this.cursor + 1)
             if (endQuoteIndex > this.cursor) {
@@ -114,13 +103,10 @@ export class JackTokenizer {
             }
             return
         }
-
-        // identifier
         if (/^[a-zA-Z_]/.test(curChar)) {
             let word: string = curChar
             let tempCursor = this.cursor + 1
 
-            // if letter or underscore, keep going until we hit a space, symbol, double-quote or new-line then stop
             while (true) {
                 const nextChar = this.contents[tempCursor]
                 if (nextChar === undefined) break
@@ -140,10 +126,9 @@ export class JackTokenizer {
         }
     }
 
+    // testing function
     createTokenFileContents(): string {
-        let tokenFileContents: string = "";
-
-        tokenFileContents += "<tokens>"
+        let tokenFileContents: string = "<tokens>";
         while (this.hasMoreTokens()) {
             this.advance()
             if (this.curToken !== undefined) {
@@ -161,7 +146,6 @@ export class JackTokenizer {
             }
         }
         tokenFileContents += "\r\n</tokens>\r\n"
-
         return tokenFileContents
     }
 }

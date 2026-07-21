@@ -2,7 +2,6 @@ import { type Kind } from './SymbolTable.js'
 export type Segment = "CONSTANT" | "ARGUMENT" | "LOCAL" | "STATIC" | "THIS" | "THAT" | "POINTER" | "TEMP"
 export type Command = "ADD" | "SUB" | "NEG" | "EQ" | "GT" | "LT" | "AND" | "OR" | "NOT"
 
-// this should only write vm commands
 export class VmWriter {
     outContent: string = ''
     kindToSegmentMap: {
@@ -21,7 +20,6 @@ export class VmWriter {
     addLine(text: string) {
         const lines = '\n' + text
         this.outContent += lines
-        console.log(lines)
     }
 
     writePush(segment: Segment | Kind, index: string | number) {
@@ -71,10 +69,9 @@ export class VmWriter {
             if (this.outContent[0] === "\n" ) {
                 this.outContent = this.outContent.slice(1)
             } else {
-                console.log("this shouldn't be here")
+                console.log("boop")
             }
         }
-
         removeStartingNewLine()
     }
 }

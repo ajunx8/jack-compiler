@@ -35,9 +35,6 @@ export class BaseTable {
 
     typeOf(name: string): string | undefined {
         const row = this.table.get(name)
-        // if (!row) {
-        //     throw new SyntaxError("variable not defined")
-        // }
         return row ? row.type : undefined
     }
 
@@ -96,9 +93,3 @@ export class SymbolTable {
         }
     }
 }
-
-// const newSt = new SymbolTable()
-// newSt.define("x", "int", "var")
-// console.log(newSt)
-// newSt.reset()
-// console.log(newSt)

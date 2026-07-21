@@ -123,5 +123,3 @@ const characterObj = {
 };
 
 export const characterMap = new Map(Object.entries(characterObj))
-
-console.log(characterMap.get("\\"))
