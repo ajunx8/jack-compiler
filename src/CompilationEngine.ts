@@ -28,7 +28,7 @@ export class CompilationEngine {
 
         const curToken = this.curToken()
         if (curToken.type !== tokenType || curToken.token !== token) {
-            throw new SyntaxError(`expected token: ${JSON.stringify({token: token, tokenType: tokenType })}, recieved: ${JSON.stringify(curToken)}`)
+            throw new SyntaxError(`expected token: ${JSON.stringify({ token: token, tokenType: tokenType })}, recieved: ${JSON.stringify(curToken)}`)
         }
 
         if (this.tokenizer.hasMoreTokens()) {
@@ -181,26 +181,32 @@ export class CompilationEngine {
     compileLet() {
         this.processToken("keyword", "let")
         let varToken = this.processToken("identifier", this.curToken().token)
-        const st = this.symbolTable.find(varToken.token)
-        const kind = st.kindOf(varToken.token)
-        const index = st.indexOf(varToken.token)
+        const varSt = this.symbolTable.find(varToken.token)
+        const varKind = varSt.kindOf(varToken.token)
+        const varIndex = varSt.indexOf(varToken.token)
 
         if (this.curToken().token === "[") {
-            if (kind !== "NONE") {
-                this.vmWriter.writePush(kind, index) // push local 0
+            if (varKind !== "NONE") {
+                this.vmWriter.writePush(varKind, varIndex) // push local 0
             }
             this.processToken("symbol", "[")
             this.compileExpression()
-            this.vmWriter.writeArithmetic("+")      // add
             this.processToken("symbol", "]")
+            this.processToken("symbol", "=")
+            this.vmWriter.writeArithmetic("+")      // add
+            this.compileExpression()
+            this.vmWriter.writePop("TEMP", 0)       // pop temp 0
+            this.vmWriter.writePop("POINTER", 1)    // pop pointer 1
+            this.vmWriter.writePush("TEMP", 0)      // push temp 0
+            this.vmWriter.writePop("THAT", 0)       // pop that 0
+        } else {
+            this.processToken("symbol", "=")
+            this.compileExpression()
+            if (varKind !== "NONE") {
+                this.vmWriter.writePop(varKind, varIndex) // "pop local 0"
+            }
         }
-        this.processToken("symbol", "=")
-        this.compileExpression()
         this.processToken("symbol", ";")
-
-        if (kind !== "NONE") {
-            this.vmWriter.writePop(kind, index)     // "pop local 0"
-        }
     }
     // ifStatement: "'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?",
     compileIf() {
@@ -257,7 +263,12 @@ export class CompilationEngine {
     // returnStatement: "'return' expression? ';'"
     compileReturn() {
         this.processToken("keyword", "return")
-        this.compileExpression()
+
+        if (this.curToken().token === ";") {        // if return is void by virtue of semi-colon existing
+            this.vmWriter.writePush("CONSTANT", 0)
+        } else {
+            this.compileExpression()
+        }
         this.processToken("symbol", ";")
         this.vmWriter.writeReturn()
     }
@@ -313,9 +324,8 @@ export class CompilationEngine {
                         }
                         this.processToken("symbol", "[")
                         this.compileExpression()
-                        this.vmWriter.writeArithmetic("+")     // add
                         this.processToken("symbol", "]")
-                        this.vmWriter.writePop("TEMP", 0)      // pop temp 0
+                        this.vmWriter.writeArithmetic("+")     // add
                         this.vmWriter.writePop("POINTER", 1)   // pop pointer 1
                         this.vmWriter.writePush("THAT", 0)     // push that 0
                         break
@@ -329,8 +339,7 @@ export class CompilationEngine {
                             const numExp1 = this.compileExpressionList()
                             this.processToken("symbol", ")")
                             this.vmWriter.writeCall(`${className}.${methodName}`, numExp1 + 1)
-                        } else {
-                            // if doesn't exist, assume its an OS **function**. trust the number of args are correct.
+                        } else { // if doesn't exist, assume its an OS **function**. trust the number of args are correct.
                             const className = identifier.token // assume identifier is the className
                             this.processToken("symbol", ".")
                             const methodName = this.processToken("identifier", this.curToken().token).token
@@ -341,14 +350,11 @@ export class CompilationEngine {
                         }
                         break
                     case "(":
-                        const thisArg = this.symbolTable.subroutineST.kindOf("this")
-                        if (thisArg !== "NONE") {
-                            this.vmWriter.writePush(thisArg, this.symbolTable.subroutineST.indexOf("this"))
-                        }
+                        this.vmWriter.writePush("POINTER", 0)
                         this.processToken("symbol", "(")
                         const numExp2 = this.compileExpressionList()
                         this.processToken("symbol", ")")
-                        this.vmWriter.writeCall(`${identifier.token}`, numExp2 + 1)
+                        this.vmWriter.writeCall(`${this.className}.${identifier.token}`, numExp2 + 1)
                         break
                     default: // if just a variable
                         if (kind !== "NONE") {
