@@ -67,11 +67,11 @@ export class JackTokenizer {
             throw new Error("curChar is undefined")
         }
 
+        // bug: Tokenizer is parsing the "do" from Main.double() as the keyword "do" when it's actually an identifier, "double".
         // keyword
-        const keywordMatch = jackGrammar.lexicalElements.keyword.find(keyword => {
-            return this.contents.startsWith(keyword, this.cursor)
-        })
-        if (keywordMatch !== undefined) {
+        const letterMatch = this.contents.slice(this.cursor).match(/^[a-z]+/)
+        let keywordMatch;
+        if (letterMatch && (keywordMatch = jackGrammar.lexicalElements.keyword.find(keyword => keyword === letterMatch[0]))) {
             this.curToken = {
                 token: keywordMatch, type: "keyword"
             }
